@@ -1,3 +1,5 @@
+.DS_Store
+test-installation/
 node_modules/
 dist/
 coverage/

@@ -68,13 +68,21 @@ tools:
     projectSkillsDir: .custom-agent/skills
 ```
 
-`sources` and `projects` contain directory paths. Paths entered through the CLI are saved as absolute paths. Relative paths written in YAML resolve from the directory containing `config.yaml`; `~/` expands to your home directory. These directories must exist and be readable. A tool's `globalSkillsDir` must be absolute or start with `~/`. Its `projectSkillsDir` must be relative and stay inside each selected project. The CLI reports the field and config file when it finds an invalid value. It does not expand other environment variables in YAML paths.
+`sources` contains directory paths. Each entry in `projects` has a unique `name` and a `path`:
+
+```yaml
+projects:
+  - name: Website
+    path: /path/to/website
+```
+
+Paths entered through the CLI are saved as absolute paths. Relative paths written in YAML resolve from the directory containing `config.yaml`; `~/` expands to your home directory. Source and project directories must exist and be readable. A tool's `globalSkillsDir` must be absolute or start with `~/`. Its `projectSkillsDir` must be relative and stay inside each selected project. The CLI reports the field and config file when it finds an invalid value. It does not expand other environment variables in YAML paths. On the next run, the CLI converts old project entries that contain only a path to named entries using the folder name. If several folders have the same name, it adds a number to keep the names distinct. You can rename them in YAML afterward.
 
 ## Interactive flow
 
 The first question asks whether to add a source directory. The CLI opens a system folder dialog to select it when available. If the dialog cannot open, enter the directory path in the terminal. The CLI then scans all saved sources, including nested directories, for `SKILL.md`. It shows each skill by name, adding its full source path only when another skill has the same name. Select one or more skills; if two have the same directory name, choose one version. Select one or more AI tools from the current YAML file, then choose global or project installation.
 
-For a project installation, you can add a folder before selecting projects. It uses the same graphical dialog and terminal fallback as source selection. Cancelling either dialog leaves the saved paths alone. Select at least one saved project. The CLI shows every planned source and destination, marks each destination as new or replacement, and asks before copying.
+For a project installation, you can add a project before selecting from saved projects. The CLI asks for its name first, then opens the same graphical folder dialog used for source selection. If the dialog cannot open, enter the folder path in the terminal. The project list shows names only. Cancelling either dialog leaves the saved paths alone. Select at least one saved project. The CLI shows every planned source and destination, marks each destination as new or replacement, and asks before copying.
 
 Cancelling a prompt or making an empty selection stops before any skill directory is copied.
 

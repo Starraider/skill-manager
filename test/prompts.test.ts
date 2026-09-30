@@ -77,15 +77,21 @@ it('saves a picked project immediately and supports multiple selected projects',
   const { file, first } = await setup();
   const p1 = path.join(root, 'p1'); const p2 = path.join(root, 'p2'); await mkdir(p1); await mkdir(p2);
   const config = await loadConfig(file);
-  await writeFile(file, (await readFile(file, 'utf8')).replace('projects: []', `projects:\n  - ${p1}`));
+  await writeFile(file, (await readFile(file, 'utf8')).replace('projects: []', `projects:\n  - name: First project\n    path: ${p1}`));
   const current = await loadConfig(file);
-  const ui = new Scripted([false, (options: Choice<unknown>[]) => [options[0].value], (options: Choice<unknown>[]) => [options[0].value], false, true, (options: Choice<unknown>[]) => options.map((item) => item.value), true]);
-  expect(await runFlow(current, ui, async () => ({ kind: 'selected', path: p2 }))).toBe('installed');
+  const ui = new Scripted([false, (options: Choice<unknown>[]) => [options[0].value], (options: Choice<unknown>[]) => [options[0].value], false, true, 'Second project', (options: Choice<unknown>[]) => options.map((item) => item.value), true]);
+  expect(await runFlow(current, ui, async (purpose) => {
+    expect(purpose).toBe('project');
+    expect(ui.seen.at(-1)).toBe('Project name');
+    return { kind: 'selected', path: p2 };
+  })).toBe('installed');
   expect(ui.options.at(-1)?.map((choice) => choice.value)).toEqual([p1, p2]);
+  expect(ui.options.at(-1)?.map((choice) => choice.label)).toEqual(['First project', 'Second project']);
   expect(await readFile(path.join(p2, '.custom', 'skills', 'review', 'SKILL.md'), 'utf8')).toBe('a');
   expect(await readFile(path.join(p1, '.custom', 'skills', 'review', 'SKILL.md'), 'utf8')).toBe('a');
   expect(first).toContain('review');
   expect(config.config.projects).toEqual([]);
+  expect((await loadConfig(file)).config.projects).toEqual([{ name: 'First project', path: p1 }, { name: 'Second project', path: p2 }]);
 });
 
 it('picker adapters distinguish selection, cancellation, and unavailable display', async () => {
@@ -112,11 +118,32 @@ it('picker adapters distinguish selection, cancellation, and unavailable display
 it('falls back to terminal path entry when no picker is available', async () => {
   const { file } = await setup();
   const project = path.join(root, 'project'); await mkdir(project);
-  const ui = new Scripted([false, (options: Choice<unknown>[]) => [options[0].value], (options: Choice<unknown>[]) => [options[0].value], false, true, project, (options: Choice<unknown>[]) => [options[0].value], false]);
+  const ui = new Scripted([false, (options: Choice<unknown>[]) => [options[0].value], (options: Choice<unknown>[]) => [options[0].value], false, true, 'Fallback project', project, (options: Choice<unknown>[]) => [options[0].value], false]);
   const result = await runFlow(await loadConfig(file), ui, async () => ({ kind: 'unavailable', reason: 'No display' }));
   expect(result).toBe('cancelled');
+  expect(ui.seen.indexOf('Project name')).toBeLessThan(ui.seen.indexOf('Project directory path'));
   expect(ui.seen).toContain('Project directory path');
-  expect((await loadConfig(file)).config.projects).toEqual([project]);
+  expect((await loadConfig(file)).config.projects).toEqual([{ name: 'Fallback project', path: project }]);
+});
+
+it('asks again for an empty or duplicate project name before opening the picker', async () => {
+  const { file } = await setup();
+  const first = path.join(root, 'first'); const second = path.join(root, 'second');
+  await mkdir(first); await mkdir(second);
+  await writeFile(file, (await readFile(file, 'utf8')).replace('projects: []', `projects:\n  - name: Existing\n    path: ${first}`));
+  const ui = new Scripted([false, (options: Choice<unknown>[]) => [options[0].value], (options: Choice<unknown>[]) => [options[0].value], false, true, ' ', 'existing', 'New', []]);
+  expect(await runFlow(await loadConfig(file), ui, async () => ({ kind: 'selected', path: second }))).toBe('nothing-to-install');
+  expect(ui.seen.filter((message) => message === 'Project name')).toHaveLength(3);
+  expect(ui.options.at(-1)?.map((choice) => choice.label)).toEqual(['Existing', 'New']);
+  expect((await loadConfig(file)).config.projects).toEqual([{ name: 'Existing', path: first }, { name: 'New', path: second }]);
+});
+
+it('does not save a project name when its folder dialog is cancelled', async () => {
+  const { file } = await setup();
+  const ui = new Scripted([false, (options: Choice<unknown>[]) => [options[0].value], (options: Choice<unknown>[]) => [options[0].value], false, true, 'Draft project']);
+  expect(await runFlow(await loadConfig(file), ui, async () => ({ kind: 'cancelled' }))).toBe('nothing-to-install');
+  expect(ui.seen.at(-1)).toBe('Project name');
+  expect((await loadConfig(file)).config.projects).toEqual([]);
 });
 
 it('does not create a target directory when the final confirmation is declined', async () => {

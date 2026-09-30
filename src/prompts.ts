@@ -1,5 +1,5 @@
 import * as clack from '@clack/prompts';
-import { addSavedDirectory, loadConfig, validateDirectory, type LoadedConfig } from './config.js';
+import { addSavedDirectory, addSavedProject, loadConfig, validateDirectory, type LoadedConfig } from './config.js';
 import { discoverSkills, duplicateSkillName, type Skill } from './discovery.js';
 import { pickFolder, type FolderPurpose, type PickResult } from './picker.js';
 import { annotatePlan, buildPlan, formatPlan } from './planner.js';
@@ -88,12 +88,24 @@ export async function runFlow(config: LoadedConfig, io: PromptIO = terminalPromp
     const addProject = await io.confirm('Add a project folder?');
     if (addProject === null) return 'cancelled';
     if (addProject) {
+      let name: string;
+      for (;;) {
+        const entered = await io.input('Project name');
+        if (entered === null) return 'cancelled';
+        name = entered.trim();
+        if (!name) { io.note('Enter a project name.'); continue; }
+        if (config.config.projects.some((project) => project.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+          io.note(`Project name already exists: ${name}`);
+          continue;
+        }
+        break;
+      }
       const selected = await requestFolder('project', io, picker);
       if (selected === null) return 'cancelled';
-      if (selected) await addSavedDirectory(config, 'projects', selected);
+      if (selected) await addSavedProject(config, name, selected);
     }
     if (!config.config.projects.length) { io.note('No project folders are configured.'); return 'nothing-to-install'; }
-    const pickedProjects = await io.multi('Select project folders', config.config.projects.map((project) => ({ label: project, value: project })));
+    const pickedProjects = await io.multi('Select project folders', config.config.projects.map((project) => ({ label: project.name, value: project.path })));
     if (pickedProjects === null) return 'cancelled';
     if (!pickedProjects.length) { io.note('Select at least one project folder.'); return 'nothing-to-install'; }
     projects = pickedProjects;

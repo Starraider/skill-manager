@@ -3,13 +3,16 @@ import { constants } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { parseDocument, stringify, type Document } from 'yaml';
+import { isSeq, parseDocument, stringify, type Document } from 'yaml';
 import { z } from 'zod';
 
 const toolSchema = z.object({ name: z.string().trim().min(1), globalSkillsDir: z.string().trim().min(1), projectSkillsDir: z.string().trim().min(1) });
-const configSchema = z.object({ sources: z.array(z.string().trim().min(1)), projects: z.array(z.string().trim().min(1)), tools: z.record(z.string(), toolSchema) });
+const projectSchema = z.object({ name: z.string().trim().min(1), path: z.string().trim().min(1) });
+const configSchema = z.object({ sources: z.array(z.string().trim().min(1)), projects: z.array(z.union([projectSchema, z.string().trim().min(1)])), tools: z.record(z.string(), toolSchema) });
 export type Tool = z.infer<typeof toolSchema>;
-export type Config = z.infer<typeof configSchema>;
+export type Project = z.infer<typeof projectSchema>;
+type RawConfig = z.infer<typeof configSchema>;
+export interface Config { sources: string[]; projects: Project[]; tools: Record<string, Tool> }
 export interface LoadedConfig { path: string; document: Document; config: Config }
 
 export const defaultTools: Record<string, Tool> = {
@@ -52,7 +55,7 @@ export async function validateDirectory(value: string, field: string, base = pro
   return resolved;
 }
 
-function parseConfig(document: Document, configPath: string): Config {
+function parseConfig(document: Document, configPath: string): RawConfig {
   if (document.errors.length) throw new Error(`${configPath}: malformed YAML: ${document.errors[0].message}`);
   const result = configSchema.safeParse(document.toJS());
   if (!result.success) { const issue = result.error.issues[0]; throw new Error(`${configPath}: ${issue.path.join('.')} ${issue.message}. Edit this field in the YAML file.`); }
@@ -76,8 +79,40 @@ export async function loadConfig(override?: string): Promise<LoadedConfig> {
   }
   const base = path.dirname(configPath);
   const sources = await Promise.all(raw.sources.map((value, index) => validateDirectory(value, `sources.${index}`, base)));
-  const projects = await Promise.all(raw.projects.map((value, index) => validateDirectory(value, `projects.${index}`, base)));
+  const namedProjects = new Set<string>();
+  for (const [index, entry] of raw.projects.entries()) {
+    if (typeof entry === 'string') continue;
+    const key = entry.name.toLocaleLowerCase();
+    if (namedProjects.has(key)) throw new Error(`${configPath}: projects.${index}.name must be unique. Rename this project in the YAML file.`);
+    namedProjects.add(key);
+  }
+  const projects: Project[] = [];
+  for (const [index, entry] of raw.projects.entries()) {
+    const oldFormat = typeof entry === 'string';
+    const projectPath = await validateDirectory(oldFormat ? entry : entry.path, oldFormat ? `projects.${index}` : `projects.${index}.path`, base);
+    let name = oldFormat ? path.basename(projectPath) || projectPath : entry.name;
+    if (oldFormat) {
+      const stem = name;
+      let suffix = 2;
+      while (namedProjects.has(name.toLocaleLowerCase())) name = `${stem} (${suffix++})`;
+      namedProjects.add(name.toLocaleLowerCase());
+    }
+    projects.push({ name, path: projectPath });
+  }
   const tools = Object.fromEntries(Object.entries(raw.tools).map(([key, tool]) => [key, { ...tool, globalSkillsDir: expandPath(tool.globalSkillsDir, base) }]));
+  if (raw.projects.some((entry) => typeof entry === 'string')) {
+    const sequence = document.get('projects', true);
+    if (!isSeq(sequence)) throw new Error(`${configPath}: projects must be a YAML list`);
+    raw.projects.forEach((entry, index) => {
+      if (typeof entry !== 'string') return;
+      const old = sequence.items[index] as { comment?: string; commentBefore?: string } | undefined;
+      const replacement = document.createNode({ name: projects[index].name, path: entry });
+      replacement.comment = old?.comment;
+      replacement.commentBefore = old?.commentBefore;
+      sequence.items[index] = replacement;
+    });
+    await atomicWrite(configPath, document.toString());
+  }
   return { path: configPath, document, config: { sources, projects, tools } };
 }
 
@@ -87,13 +122,29 @@ async function atomicWrite(configPath: string, content: string): Promise<void> {
   catch (error) { await rm(temporary, { force: true }); throw error; }
 }
 
-export async function addSavedDirectory(loaded: LoadedConfig, kind: 'sources' | 'projects', value: string): Promise<string> {
+export async function addSavedDirectory(loaded: LoadedConfig, kind: 'sources', value: string): Promise<string> {
   const resolved = await validateDirectory(value, kind, process.cwd());
-  if (loaded.config[kind].includes(resolved)) return resolved;
+  if (loaded.config.sources.includes(resolved)) return resolved;
   const sequence = loaded.document.get(kind, true);
-  if (!sequence || !(sequence as { add?: unknown }).add) throw new Error(`${loaded.path}: ${kind} must be a YAML list`);
-  (sequence as { add(value: string): void }).add(resolved);
+  if (!isSeq(sequence)) throw new Error(`${loaded.path}: ${kind} must be a YAML list`);
+  sequence.add(resolved);
   await atomicWrite(loaded.path, loaded.document.toString());
-  loaded.config[kind].push(resolved);
+  loaded.config.sources.push(resolved);
   return resolved;
+}
+
+export async function addSavedProject(loaded: LoadedConfig, name: string, value: string): Promise<Project> {
+  const trimmedName = name.trim();
+  if (!trimmedName) throw new Error('Project name cannot be empty');
+  if (loaded.config.projects.some((project) => project.name.toLocaleLowerCase() === trimmedName.toLocaleLowerCase())) throw new Error(`Project name already exists: ${trimmedName}`);
+  const resolved = await validateDirectory(value, 'project', process.cwd());
+  const existing = loaded.config.projects.find((project) => project.path === resolved);
+  if (existing) throw new Error(`Project folder is already saved as ${existing.name}: ${resolved}`);
+  const sequence = loaded.document.get('projects', true);
+  if (!isSeq(sequence)) throw new Error(`${loaded.path}: projects must be a YAML list`);
+  sequence.add({ name: trimmedName, path: resolved });
+  await atomicWrite(loaded.path, loaded.document.toString());
+  const project = { name: trimmedName, path: resolved };
+  loaded.config.projects.push(project);
+  return project;
 }

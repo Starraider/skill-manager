@@ -20,7 +20,7 @@ async function setup() {
 it('plans multiple tools and projects, deduplicating shared directories', async () => {
   const source = await setup();
   const p1 = path.join(root, 'p1'); const p2 = path.join(root, 'p2'); await mkdir(p1); await mkdir(p2);
-  const config = { sources: [], projects: [p1, p2], tools: {
+  const config = { sources: [], projects: [{ name: 'One', path: p1 }, { name: 'Two', path: p2 }], tools: {
     a: { name: 'A', globalSkillsDir: path.join(root, 'global'), projectSkillsDir: '.agents/skills' },
     b: { name: 'B', globalSkillsDir: path.join(root, 'global'), projectSkillsDir: '.agents/skills' },
   } };
