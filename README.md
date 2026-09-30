@@ -2,17 +2,51 @@
 
 Skill manager copies local skill bundles into the skills directories used by AI coding tools. A bundle is a directory containing `SKILL.md`; scripts and other files in that directory travel with it.
 
-## Run it
+## Installation
 
-Requires Node.js 20 or newer.
+Install [Git](https://git-scm.com/downloads) and [Node.js 20 or newer](https://nodejs.org/en/download) first. Node.js includes npm. Check that both are available:
 
 ```sh
-npm install
+git --version
+node --version
+npm --version
+```
+
+Clone the [GitHub repository](https://github.com/Starraider/skill-manager.git), install its locked dependencies, and build the CLI:
+
+```sh
+git clone https://github.com/Starraider/skill-manager.git
+cd skill-manager
+npm ci
 npm run build
+```
+
+Check the command, then start the interactive installer:
+
+```sh
+node dist/cli.js --help
 node dist/cli.js
 ```
 
-Use `node dist/cli.js --config /path/to/config.yaml` to use a specific configuration file. `npm run dev -- --config /path/to/config.yaml` runs the TypeScript source.
+The first run creates your YAML configuration file and asks whether to add a source directory. Give it a directory containing skill bundles, either directly or in nested folders. Each bundle must contain `SKILL.md`. Then select the skills, AI tools, and global or project destinations. The CLI shows the planned copies and asks for confirmation before installing them. The [configuration](#configuration) and [interactive flow](#interactive-flow) sections below explain those choices.
+
+To run `skill-manager` from any directory, register the built CLI with npm from the cloned repository:
+
+```sh
+npm link
+skill-manager --help
+skill-manager
+```
+
+This step is optional. You can always run `node dist/cli.js` from the repository directory. Use `node dist/cli.js --config /path/to/config.yaml`, or `skill-manager --config /path/to/config.yaml` after linking, to use a specific configuration file. `npm run dev -- --config /path/to/config.yaml` runs the TypeScript source while developing.
+
+To update an existing clone, run these commands from its `skill-manager` directory:
+
+```sh
+git pull
+npm ci
+npm run build
+```
 
 ## Configuration
 
