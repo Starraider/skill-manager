@@ -1,0 +1,34 @@
+#!/usr/bin/expect -f
+set timeout 15
+set mode [lindex $argv 0]
+set config [lindex $argv 1]
+log_user 0
+spawn node dist/cli.js --config $config
+exec stty rows 40 columns 160 < $spawn_out(slave,name)
+expect "Add another source path?"
+after 200
+send "n\r"
+expect "Select skills"
+after 200
+send " \r"
+expect "Select AI tools"
+after 200
+send " \r"
+expect "Install globally?"
+after 200
+if {$mode eq "project"} { send "n\r" } else { send "y\r" }
+if {$mode eq "project"} {
+  expect "Add a project folder?"
+  after 200
+  send "n\r"
+  expect "Select project folders"
+  after 200
+  send " \033\[B \r"
+}
+expect "Install these skills?"
+after 200
+send "y\r"
+expect eof
+set status [wait]
+puts "smoke $mode exit [lindex $status 3]"
+exit [lindex $status 3]

@@ -1,0 +1,30 @@
+{
+  "name": "skill-manager",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "skill-manager": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc && node scripts/make-executable.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "dev": "tsx src/cli.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@clack/prompts": "^1.8.1",
+    "commander": "^15.0.0",
+    "execa": "^10.0.1",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2"
+  }
+}
