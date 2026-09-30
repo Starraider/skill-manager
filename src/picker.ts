@@ -2,23 +2,26 @@ import { execa } from 'execa';
 
 export type PickResult = { kind: 'selected'; path: string } | { kind: 'cancelled' } | { kind: 'unavailable'; reason: string };
 export interface PickerCommand { file: string; args: string[] }
+export type FolderPurpose = 'source' | 'project';
 
-export function pickerCommand(platform = process.platform, env = process.env): PickerCommand | undefined {
-  if (platform === 'darwin') return { file: 'osascript', args: ['-e', 'POSIX path of (choose folder with prompt "Select a project folder")'] };
-  if (platform === 'win32') return { file: 'powershell.exe', args: ['-NoProfile', '-Command', 'Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.FolderBrowserDialog; if ($d.ShowDialog() -eq "OK") { Write-Output $d.SelectedPath }'] };
-  if (platform === 'linux' && (env.DISPLAY || env.WAYLAND_DISPLAY)) return { file: 'zenity', args: ['--file-selection', '--directory', '--title=Select a project folder'] };
+export function pickerCommand(platform = process.platform, env = process.env, purpose: FolderPurpose = 'project'): PickerCommand | undefined {
+  const title = `Select a ${purpose} folder`;
+  if (platform === 'darwin') return { file: 'osascript', args: ['-e', `POSIX path of (choose folder with prompt "${title}")`] };
+  if (platform === 'win32') return { file: 'powershell.exe', args: ['-NoProfile', '-Command', `Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description = "${title}"; if ($d.ShowDialog() -eq "OK") { Write-Output $d.SelectedPath }`] };
+  if (platform === 'linux' && (env.DISPLAY || env.WAYLAND_DISPLAY)) return { file: 'zenity', args: ['--file-selection', '--directory', `--title=${title}`] };
   return undefined;
 }
 
-export async function pickProjectFolder(
+export async function pickFolder(
+  purpose: FolderPurpose,
   platform = process.platform,
   env = process.env,
   execute: typeof execa = execa,
 ): Promise<PickResult> {
-  const command = pickerCommand(platform, env);
+  const command = pickerCommand(platform, env, purpose);
   if (!command) return { kind: 'unavailable', reason: 'No graphical folder picker is available in this session' };
   const candidates = platform === 'linux'
-    ? [command, { file: 'kdialog', args: ['--getexistingdirectory'] }]
+    ? [command, { file: 'kdialog', args: ['--title', `Select a ${purpose} folder`, '--getexistingdirectory'] }]
     : [command];
   let reason = '';
   for (const candidate of candidates) {
@@ -31,4 +34,8 @@ export async function pickProjectFolder(
     } catch (error) { reason = error instanceof Error ? error.message : String(error); }
   }
   return { kind: 'unavailable', reason };
+}
+
+export function pickProjectFolder(platform = process.platform, env = process.env, execute: typeof execa = execa): Promise<PickResult> {
+  return pickFolder('project', platform, env, execute);
 }

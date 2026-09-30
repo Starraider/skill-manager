@@ -1,7 +1,7 @@
 import * as clack from '@clack/prompts';
 import { addSavedDirectory, loadConfig, validateDirectory, type LoadedConfig } from './config.js';
 import { discoverSkills, duplicateSkillName, type Skill } from './discovery.js';
-import { pickProjectFolder, type PickResult } from './picker.js';
+import { pickFolder, type FolderPurpose, type PickResult } from './picker.js';
 import { annotatePlan, buildPlan, formatPlan } from './planner.js';
 import { executePlan, formatResults, preflight } from './executor.js';
 
@@ -24,7 +24,12 @@ export const terminalPrompts: PromptIO = {
 };
 
 export function skillChoices(skills: Skill[]): Choice<Skill>[] {
-  return skills.map((skill) => ({ label: `${skill.name} — ${skill.source}`, value: skill }));
+  const counts = new Map<string, number>();
+  for (const skill of skills) counts.set(skill.name, (counts.get(skill.name) ?? 0) + 1);
+  return skills.map((skill) => ({
+    label: counts.get(skill.name)! > 1 ? `${skill.name} — ${skill.source}` : skill.name,
+    value: skill,
+  }));
 }
 
 export function toolChoices(config: LoadedConfig): Choice<string>[] {
@@ -33,13 +38,31 @@ export function toolChoices(config: LoadedConfig): Choice<string>[] {
 
 export type FlowResult = 'cancelled' | 'nothing-to-install' | 'installed' | 'failed';
 
-export async function runFlow(config: LoadedConfig, io: PromptIO = terminalPrompts, picker: () => Promise<PickResult> = pickProjectFolder): Promise<FlowResult> {
+async function requestFolder(
+  purpose: FolderPurpose,
+  io: PromptIO,
+  picker: (purpose: FolderPurpose) => Promise<PickResult>,
+): Promise<string | undefined | null> {
+  const picked = await picker(purpose);
+  if (picked.kind === 'cancelled') return undefined;
+  if (picked.kind === 'selected') {
+    try { return await validateDirectory(picked.path, purpose); }
+    catch (error) { io.note(`Folder picker returned an invalid directory: ${(error as Error).message}`); }
+  } else {
+    io.note(`${picked.reason}. Enter a path in the terminal.`);
+  }
+  const entered = await io.input(`${purpose === 'source' ? 'Source' : 'Project'} directory path`);
+  if (entered === null) return null;
+  return validateDirectory(entered, purpose);
+}
+
+export async function runFlow(config: LoadedConfig, io: PromptIO = terminalPrompts, picker: (purpose: FolderPurpose) => Promise<PickResult> = pickFolder): Promise<FlowResult> {
   const addSource = await io.confirm('Add another source path?');
   if (addSource === null) return 'cancelled';
   if (addSource) {
-    const entered = await io.input('Source directory path');
-    if (entered === null) return 'cancelled';
-    await addSavedDirectory(config, 'sources', entered);
+    const selected = await requestFolder('source', io, picker);
+    if (selected === null) return 'cancelled';
+    if (selected) await addSavedDirectory(config, 'sources', selected);
   }
   if (!config.config.sources.length) { io.note('No source directories are configured.'); return 'nothing-to-install'; }
   const discovered = await discoverSkills(config.config.sources);
@@ -65,18 +88,8 @@ export async function runFlow(config: LoadedConfig, io: PromptIO = terminalPromp
     const addProject = await io.confirm('Add a project folder?');
     if (addProject === null) return 'cancelled';
     if (addProject) {
-      const picked = await picker();
-      let selected: string | undefined;
-      if (picked.kind === 'selected') {
-        try { selected = await validateDirectory(picked.path, 'project'); }
-        catch (error) { io.note(`Folder picker returned an invalid directory: ${(error as Error).message}`); }
-      }
-      if (picked.kind === 'unavailable' || (picked.kind === 'selected' && !selected)) {
-        io.note(picked.kind === 'unavailable' ? `${picked.reason}. Enter a path in the terminal.` : 'Enter a valid project path in the terminal.');
-        const entered = await io.input('Project directory path');
-        if (entered === null) return 'cancelled';
-        selected = entered;
-      }
+      const selected = await requestFolder('project', io, picker);
+      if (selected === null) return 'cancelled';
       if (selected) await addSavedDirectory(config, 'projects', selected);
     }
     if (!config.config.projects.length) { io.note('No project folders are configured.'); return 'nothing-to-install'; }

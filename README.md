@@ -28,7 +28,7 @@ node dist/cli.js --help
 node dist/cli.js
 ```
 
-The first run creates your YAML configuration file and asks whether to add a source directory. Give it a directory containing skill bundles, either directly or in nested folders. Each bundle must contain `SKILL.md`. Then select the skills, AI tools, and global or project destinations. The CLI shows the planned copies and asks for confirmation before installing them. The [configuration](#configuration) and [interactive flow](#interactive-flow) sections below explain those choices.
+The first run creates your YAML configuration file and asks whether to add a source directory. Select a directory containing skill bundles, either directly or in nested folders. Each bundle must contain `SKILL.md`. Then select the skills, AI tools, and global or project destinations. The CLI shows the planned copies and asks for confirmation before installing them. The [configuration](#configuration) and [interactive flow](#interactive-flow) sections below explain those choices.
 
 To run `skill-manager` from any directory, register the built CLI with npm from the cloned repository:
 
@@ -72,9 +72,9 @@ tools:
 
 ## Interactive flow
 
-The first question asks whether to add a source directory. The CLI then scans all saved sources, including nested directories, for `SKILL.md`. It shows each skill name with its full source path. Select one or more skills; if two have the same directory name, choose one version. Select one or more AI tools from the current YAML file, then choose global or project installation.
+The first question asks whether to add a source directory. The CLI opens a system folder dialog to select it when available. If the dialog cannot open, enter the directory path in the terminal. The CLI then scans all saved sources, including nested directories, for `SKILL.md`. It shows each skill by name, adding its full source path only when another skill has the same name. Select one or more skills; if two have the same directory name, choose one version. Select one or more AI tools from the current YAML file, then choose global or project installation.
 
-For a project installation, you can add a folder before selecting projects. The CLI opens a system folder dialog when available. If the dialog cannot open, it asks for a path in the terminal. Cancelling the dialog leaves saved projects alone. Select at least one saved project. The CLI shows every planned source and destination, marks each destination as new or replacement, and asks before copying.
+For a project installation, you can add a folder before selecting projects. It uses the same graphical dialog and terminal fallback as source selection. Cancelling either dialog leaves the saved paths alone. Select at least one saved project. The CLI shows every planned source and destination, marks each destination as new or replacement, and asks before copying.
 
 Cancelling a prompt or making an empty selection stops before any skill directory is copied.
 

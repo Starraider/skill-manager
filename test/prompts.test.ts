@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { loadConfig } from '../src/config.js';
 import { runFlow, skillChoices, toolChoices, type Choice, type PromptIO } from '../src/prompts.js';
-import { pickProjectFolder, pickerCommand } from '../src/picker.js';
+import { pickFolder, pickProjectFolder, pickerCommand } from '../src/picker.js';
 import { discoverSkills } from '../src/discovery.js';
 
 let root = '';
@@ -44,6 +44,19 @@ it('shows both same-named skills and repeats selection until only one is chosen'
   expect(ui.notes.some((note) => note.includes('Two selected skills'))).toBe(true);
 });
 
+it('shows source paths only for duplicate skill names', () => {
+  const skills = [
+    { name: 'review', source: '/sources/a/review' },
+    { name: 'format', source: '/sources/b/format' },
+    { name: 'review', source: '/sources/c/review' },
+  ];
+  expect(skillChoices(skills).map((choice) => choice.label)).toEqual([
+    'review — /sources/a/review',
+    'format',
+    'review — /sources/c/review',
+  ]);
+});
+
 it('exits on empty discovery, cancellation, or no selection without changing a target', async () => {
   const { file } = await setup();
   const config = await loadConfig(file);
@@ -79,7 +92,10 @@ it('picker adapters distinguish selection, cancellation, and unavailable display
   expect(pickerCommand('linux', {})).toBeUndefined();
   expect(pickerCommand('darwin')?.file).toBe('osascript');
   expect(pickerCommand('win32')?.file).toBe('powershell.exe');
+  expect(pickerCommand('darwin', {}, 'source')?.args.join(' ')).toContain('Select a source folder');
+  expect(pickerCommand('linux', { DISPLAY: ':1' }, 'source')?.args).toContain('--title=Select a source folder');
   expect(await pickProjectFolder('linux', {})).toMatchObject({ kind: 'unavailable' });
+  expect(await pickFolder('source', 'linux', {})).toMatchObject({ kind: 'unavailable' });
   const selected = await pickProjectFolder('linux', { DISPLAY: ':1' }, (async () => ({ stdout: '/tmp/project\n', stderr: '', exitCode: 0 })) as never);
   expect(selected).toEqual({ kind: 'selected', path: '/tmp/project' });
   const cancelled = await pickProjectFolder('linux', { DISPLAY: ':1' }, (async () => ({ stdout: '', stderr: '', exitCode: 1 })) as never);
@@ -116,9 +132,32 @@ it('saves a newly entered source and offers its skills in the same run', async (
   const second = path.join(root, 'source-b', 'new-skill');
   await mkdir(second, { recursive: true }); await writeFile(path.join(second, 'SKILL.md'), 'new');
   const ui = new Scripted([true, path.dirname(second), []]);
-  expect(await runFlow(await loadConfig(file), ui)).toBe('nothing-to-install');
-  expect(ui.options[0].map((choice) => choice.label)).toEqual([
-    expect.stringContaining('new-skill'), expect.stringContaining('review'),
-  ]);
+  expect(await runFlow(await loadConfig(file), ui, async () => ({ kind: 'unavailable', reason: 'No display' }))).toBe('nothing-to-install');
+  expect(ui.seen).toContain('Source directory path');
+  expect(ui.options[0].map((choice) => choice.label)).toEqual(['new-skill', 'review']);
   expect((await loadConfig(file)).config.sources).toContain(path.dirname(second));
+});
+
+it('adds a source selected in the graphical picker without a path prompt', async () => {
+  const { file } = await setup();
+  const second = path.join(root, 'source-b', 'new-skill');
+  await mkdir(second, { recursive: true }); await writeFile(path.join(second, 'SKILL.md'), 'new');
+  const ui = new Scripted([true, []]);
+  const purposes: string[] = [];
+  expect(await runFlow(await loadConfig(file), ui, async (purpose) => {
+    purposes.push(purpose);
+    return { kind: 'selected', path: path.dirname(second) };
+  })).toBe('nothing-to-install');
+  expect(purposes).toEqual(['source']);
+  expect(ui.seen).not.toContain('Source directory path');
+  expect(ui.options[0].map((choice) => choice.label)).toContain('new-skill');
+  expect((await loadConfig(file)).config.sources).toContain(path.dirname(second));
+});
+
+it('leaves the source list unchanged when the graphical picker is cancelled', async () => {
+  const { file } = await setup();
+  const ui = new Scripted([true, []]);
+  expect(await runFlow(await loadConfig(file), ui, async () => ({ kind: 'cancelled' }))).toBe('nothing-to-install');
+  expect(ui.seen).not.toContain('Source directory path');
+  expect((await loadConfig(file)).config.sources).toEqual([path.join(root, 'source-a')]);
 });
