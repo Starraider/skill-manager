@@ -251,6 +251,26 @@ body {
   cursor: not-allowed;
 }
 
+.btn-icon {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.btn-icon:hover {
+  background-color: var(--surface-active);
+  color: var(--text-main);
+}
+
 /* Badges & Status */
 .badge {
   display: inline-flex;

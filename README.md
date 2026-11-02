@@ -292,12 +292,14 @@ The file is seeded with the default harness definitions (Codex, Claude Code, Cur
 
 1. **Step 1: Add a Source Directory**
    - Click the **1. Sources** tab in the top navigation.
-   - Click **+ Add Source Folder** and select a folder containing your agent skills (e.g., `~/my-skills`).
+   - Click **+ Add** to add a source directory. In the dialog, assign a custom display name (independent of the filesystem path, e.g. `"TYPO3 Skill"`) and select or enter its directory path (e.g. `/Users/svenkalbhenn/Skills/typo3`).
+   - You can edit or rename any source anytime by clicking **Edit** in the toolbar, the **✎** button on the card, or by double-clicking the item card.
    - Skill-Manager scans immediate subdirectories and lists all valid skills with their titles and descriptions.
 
 2. **Step 2: Add Target Projects (Optional)**
    - Click the **2. Targets** tab.
-   - Click **+ Add Target Project** and select a project repository where you want skills deployed (e.g., `~/projects/web-app`).
+   - Click **+ Add** to add a project destination. Assign a custom name (e.g. `"My Project"`) and choose or enter its project path (e.g. `/Users/svenkalbhenn/Projekte/kunden-projekt`).
+   - You can edit or rename any target anytime by clicking **Edit**, the **✎** button, or double-clicking the item card.
    - The built-in **Global** target is always available.
 
 3. **Step 3: Deploy Skills**

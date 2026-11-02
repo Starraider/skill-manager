@@ -77,3 +77,64 @@ fn test_corrupt_config_recovers_to_default() {
 
     assert_eq!(loaded, AppConfig::default_seeded());
 }
+
+#[test]
+fn test_custom_names_and_rename_independent_of_paths() {
+    let mock_dir = common::create_mock_config_dir();
+    let config_path = mock_dir.path().join("config.json");
+
+    let mut config = AppConfig::default_seeded();
+
+    // 1. Assign custom names independent of filesystem paths
+    let source_path = PathBuf::from("/Users/svenkalbhenn/Skills/typo3");
+    config.sources.push(skill_manager::models::config::SourceConfig {
+        id: "source-typo3".to_string(),
+        name: "TYPO3 Skill".to_string(),
+        path: source_path.clone(),
+    });
+
+    let target_path = PathBuf::from("/Users/svenkalbhenn/Projekte/kunden-projekt");
+    config.targets.push(skill_manager::models::config::TargetConfig {
+        id: "target-kunden".to_string(),
+        name: "My Project".to_string(),
+        path: target_path.clone(),
+        is_global: false,
+        is_pinned: false,
+    });
+
+    save_config_to_path(&config, &config_path).expect("Initial save should succeed");
+
+    let loaded = load_config_from_path(&config_path).expect("Loading config should succeed");
+    assert_eq!(loaded.sources.len(), 1);
+    assert_eq!(loaded.sources[0].name, "TYPO3 Skill");
+    assert_eq!(loaded.sources[0].path, source_path);
+
+    let found_target = loaded
+        .targets
+        .iter()
+        .find(|t| t.id == "target-kunden")
+        .expect("Target should be found");
+    assert_eq!(found_target.name, "My Project");
+    assert_eq!(found_target.path, target_path);
+
+    // 2. Change names afterward for both source and destination
+    let mut updated_config = loaded;
+    updated_config.sources[0].name = "TYPO3 Enterprise Skill".to_string();
+    if let Some(t) = updated_config.targets.iter_mut().find(|t| t.id == "target-kunden") {
+        t.name = "Renamed Project".to_string();
+    }
+
+    save_config_to_path(&updated_config, &config_path).expect("Updating names should succeed");
+
+    let reloaded = load_config_from_path(&config_path).expect("Reloading should succeed");
+    assert_eq!(reloaded.sources[0].name, "TYPO3 Enterprise Skill");
+    assert_eq!(reloaded.sources[0].path, source_path); // path unchanged
+
+    let reloaded_target = reloaded
+        .targets
+        .iter()
+        .find(|t| t.id == "target-kunden")
+        .expect("Target should still exist");
+    assert_eq!(reloaded_target.name, "Renamed Project");
+    assert_eq!(reloaded_target.path, target_path); // path unchanged
+}
