@@ -344,6 +344,21 @@ tr:hover td {
   background-color: rgba(255, 255, 255, 0.02);
 }
 
+.skill-name-interactive {
+  font-weight: 600;
+  color: var(--text-main);
+  cursor: help;
+  display: inline-block;
+  text-decoration: underline dotted var(--text-muted);
+  text-underline-offset: 4px;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+
+.skill-name-interactive:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
 /* Forms */
 .form-group {
   margin-bottom: 16px;

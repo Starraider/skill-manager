@@ -366,8 +366,6 @@ pub fn TabSources() -> Element {
                                             }
                                         }
                                         th { "Skill Name" }
-                                        th { "Title" }
-                                        th { "Description" }
                                         th { "Folder" }
                                     }
                                 }
@@ -376,6 +374,12 @@ pub fn TabSources() -> Element {
                                         {
                                             let s_name = skill.name.clone();
                                             let is_checked = selected_skill_names().contains(&skill.name);
+                                            let tooltip_text = skill
+                                                .description
+                                                .as_deref()
+                                                .filter(|d| !d.trim().is_empty())
+                                                .or_else(|| skill.title.as_deref().filter(|t| !t.trim().is_empty()))
+                                                .unwrap_or("No description available");
                                             rsx! {
                                                 tr { key: "{skill.name}",
                                                     td {
@@ -396,10 +400,12 @@ pub fn TabSources() -> Element {
                                                             }
                                                         }
                                                     }
-                                                    td { style: "font-weight: 600;", "{skill.name}" }
-                                                    td { "{skill.title.as_deref().unwrap_or(\"-\")}" }
-                                                    td { style: "max-width: 320px; color: var(--text-muted);",
-                                                        "{skill.description.as_deref().unwrap_or(\"-\")}"
+                                                    td {
+                                                        span {
+                                                            class: "skill-name-interactive",
+                                                            title: "{tooltip_text}",
+                                                            "{skill.name}"
+                                                        }
                                                     }
                                                     td { style: "font-size: 11px; color: var(--text-muted);",
                                                         "{skill.folder_path.file_name().unwrap_or_default().to_string_lossy()}"
