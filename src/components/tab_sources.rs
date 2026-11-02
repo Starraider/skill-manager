@@ -9,6 +9,100 @@ use crate::models::state::AppState;
 use crate::services::config_store::{expand_tilde, save_config};
 use crate::services::fs_scanner::scan_skills;
 
+fn open_source_add_dialog(
+    mut editing_id: Signal<Option<String>>,
+    mut name: Signal<String>,
+    mut path: Signal<String>,
+    mut error: Signal<Option<String>>,
+    mut is_edit: Signal<bool>,
+    mut is_open: Signal<bool>,
+) {
+    editing_id.set(None);
+    name.set(String::new());
+    path.set(String::new());
+    error.set(None);
+    is_edit.set(false);
+    is_open.set(true);
+}
+
+fn open_source_edit_dialog(
+    source: &SourceConfig,
+    mut editing_id: Signal<Option<String>>,
+    mut name: Signal<String>,
+    mut path: Signal<String>,
+    mut error: Signal<Option<String>>,
+    mut is_edit: Signal<bool>,
+    mut is_open: Signal<bool>,
+) {
+    editing_id.set(Some(source.id.clone()));
+    name.set(source.name.clone());
+    path.set(source.path.to_string_lossy().to_string());
+    error.set(None);
+    is_edit.set(true);
+    is_open.set(true);
+}
+
+fn save_source_modal(
+    mut state: AppState,
+    mut is_modal_open: Signal<bool>,
+    modal_is_edit: Signal<bool>,
+    editing_source_id: Signal<Option<String>>,
+    form_name: Signal<String>,
+    form_path: Signal<String>,
+    mut form_error: Signal<Option<String>>,
+) {
+    let trimmed_name = form_name().trim().to_string();
+    let trimmed_path = form_path().trim().to_string();
+
+    if trimmed_name.is_empty() {
+        form_error.set(Some("Please enter a name for the source folder.".to_string()));
+        return;
+    }
+    if trimmed_path.is_empty() {
+        form_error.set(Some("Please specify a directory path.".to_string()));
+        return;
+    }
+
+    let path_buf = PathBuf::from(trimmed_path);
+    let mut current_config = (state.config)();
+
+    if modal_is_edit() {
+        if let Some(ref id) = editing_source_id() {
+            if let Some(s) = current_config.sources.iter_mut().find(|s| s.id == *id) {
+                s.name = trimmed_name.clone();
+                s.path = path_buf;
+            }
+        }
+        let _ = save_config(&current_config);
+        state.config.set(current_config);
+        state
+            .status_message
+            .set(Some(format!("Updated source '{}'.", trimmed_name)));
+    } else {
+        let id = format!(
+            "source-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis()
+        );
+        let new_source = SourceConfig {
+            id: id.clone(),
+            name: trimmed_name.clone(),
+            path: path_buf,
+        };
+        current_config.sources.push(new_source);
+        let _ = save_config(&current_config);
+        state.config.set(current_config);
+        state.selected_source_id.set(Some(id));
+        state
+            .status_message
+            .set(Some(format!("Added source '{}'.", trimmed_name)));
+    }
+
+    is_modal_open.set(false);
+}
+
 #[component]
 pub fn TabSources() -> Element {
     let mut state: AppState = use_context();
@@ -36,103 +130,6 @@ pub fn TabSources() -> Element {
     let mut form_name = use_signal(String::new);
     let mut form_path = use_signal(String::new);
     let mut form_error = use_signal(|| None::<String>);
-
-    let on_open_add = move |_| {
-        editing_source_id.set(None);
-        form_name.set(String::new());
-        form_path.set(String::new());
-        form_error.set(None);
-        modal_is_edit.set(false);
-        is_modal_open.set(true);
-    };
-
-    let on_open_edit = {
-        let src_opt = selected_source.clone();
-        move |_| {
-            if let Some(ref s) = src_opt {
-                editing_source_id.set(Some(s.id.clone()));
-                form_name.set(s.name.clone());
-                form_path.set(s.path.to_string_lossy().to_string());
-                form_error.set(None);
-                modal_is_edit.set(true);
-                is_modal_open.set(true);
-            }
-        }
-    };
-
-    let on_browse_folder = move |_| {
-        let cur_path = form_path();
-        spawn(async move {
-            let start = if !cur_path.is_empty() {
-                Some(PathBuf::from(&cur_path))
-            } else {
-                None
-            };
-            if let Some(folder) = pick_folder("Select Source Directory", start.as_deref()).await {
-                let folder_str = folder.to_string_lossy().to_string();
-                form_path.set(folder_str);
-                if form_name().trim().is_empty() {
-                    if let Some(basename) = folder.file_name() {
-                        form_name.set(basename.to_string_lossy().to_string());
-                    }
-                }
-                form_error.set(None);
-            }
-        });
-    };
-
-    let on_save_modal = move || {
-        let trimmed_name = form_name().trim().to_string();
-        let trimmed_path = form_path().trim().to_string();
-
-        if trimmed_name.is_empty() {
-            form_error.set(Some("Please enter a name for the source folder.".to_string()));
-            return;
-        }
-        if trimmed_path.is_empty() {
-            form_error.set(Some("Please specify a directory path.".to_string()));
-            return;
-        }
-
-        let path_buf = PathBuf::from(trimmed_path);
-        let mut current_config = (state.config)();
-
-        if modal_is_edit() {
-            if let Some(ref id) = editing_source_id() {
-                if let Some(s) = current_config.sources.iter_mut().find(|s| s.id == *id) {
-                    s.name = trimmed_name.clone();
-                    s.path = path_buf;
-                }
-            }
-            let _ = save_config(&current_config);
-            state.config.set(current_config);
-            state
-                .status_message
-                .set(Some(format!("Updated source '{}'.", trimmed_name)));
-        } else {
-            let id = format!(
-                "source-{}",
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis()
-            );
-            let new_source = SourceConfig {
-                id: id.clone(),
-                name: trimmed_name.clone(),
-                path: path_buf,
-            };
-            current_config.sources.push(new_source);
-            let _ = save_config(&current_config);
-            state.config.set(current_config);
-            state.selected_source_id.set(Some(id));
-            state
-                .status_message
-                .set(Some(format!("Added source '{}'.", trimmed_name)));
-        }
-
-        is_modal_open.set(false);
-    };
 
     let on_remove_source = {
         let current_id = selected_source_id.clone();
@@ -167,6 +164,8 @@ pub fn TabSources() -> Element {
         }
     };
 
+    let selected_source_for_header = selected_source.clone();
+
     rsx! {
         div { class: "split-layout",
             // Left Pane: Source Folders
@@ -176,12 +175,36 @@ pub fn TabSources() -> Element {
                     div { style: "display: flex; gap: 6px;",
                         button {
                             class: "btn btn-primary btn-sm",
-                            onclick: on_open_add,
+                            onclick: move |_| {
+                                open_source_add_dialog(
+                                    editing_source_id,
+                                    form_name,
+                                    form_path,
+                                    form_error,
+                                    modal_is_edit,
+                                    is_modal_open,
+                                );
+                            },
                             "+ Add"
                         }
                         button {
                             class: "btn btn-secondary btn-sm",
-                            onclick: on_open_edit,
+                            onclick: {
+                                let src_opt = selected_source.clone();
+                                move |_| {
+                                    if let Some(ref s) = src_opt {
+                                        open_source_edit_dialog(
+                                            s,
+                                            editing_source_id,
+                                            form_name,
+                                            form_path,
+                                            form_error,
+                                            modal_is_edit,
+                                            is_modal_open,
+                                        );
+                                    }
+                                }
+                            },
                             disabled: selected_source.is_none(),
                             "Edit"
                         }
@@ -199,7 +222,16 @@ pub fn TabSources() -> Element {
                             p { "No sources added yet." }
                             button {
                                 class: "btn btn-secondary btn-sm",
-                                onclick: on_open_add,
+                                onclick: move |_| {
+                                    open_source_add_dialog(
+                                        editing_source_id,
+                                        form_name,
+                                        form_path,
+                                        form_error,
+                                        modal_is_edit,
+                                        is_modal_open,
+                                    );
+                                },
                                 "Add Source Folder"
                             }
                         }
@@ -218,15 +250,18 @@ pub fn TabSources() -> Element {
                                             state.selected_source_id.set(Some(sid.clone()));
                                             selected_skill_names.set(HashSet::new());
                                         },
-                                        ondblclick: {
+                                        ondoubleclick: {
                                             let s = s_clone.clone();
                                             move |_| {
-                                                editing_source_id.set(Some(s.id.clone()));
-                                                form_name.set(s.name.clone());
-                                                form_path.set(s.path.to_string_lossy().to_string());
-                                                form_error.set(None);
-                                                modal_is_edit.set(true);
-                                                is_modal_open.set(true);
+                                                open_source_edit_dialog(
+                                                    &s,
+                                                    editing_source_id,
+                                                    form_name,
+                                                    form_path,
+                                                    form_error,
+                                                    modal_is_edit,
+                                                    is_modal_open,
+                                                );
                                             }
                                         },
                                         div { class: "item-header",
@@ -241,12 +276,15 @@ pub fn TabSources() -> Element {
                                                             e.stop_propagation();
                                                             state.selected_source_id.set(Some(s.id.clone()));
                                                             selected_skill_names.set(HashSet::new());
-                                                            editing_source_id.set(Some(s.id.clone()));
-                                                            form_name.set(s.name.clone());
-                                                            form_path.set(s.path.to_string_lossy().to_string());
-                                                            form_error.set(None);
-                                                            modal_is_edit.set(true);
-                                                            is_modal_open.set(true);
+                                                            open_source_edit_dialog(
+                                                                &s,
+                                                                editing_source_id,
+                                                                form_name,
+                                                                form_path,
+                                                                form_error,
+                                                                modal_is_edit,
+                                                                is_modal_open,
+                                                            );
                                                         }
                                                     },
                                                     "✎"
@@ -274,10 +312,25 @@ pub fn TabSources() -> Element {
                                 "Discovered Skills"
                             }
                         }
-                        if selected_source.is_some() {
+                        if selected_source_for_header.is_some() {
                             button {
                                 class: "btn btn-secondary btn-sm",
-                                onclick: on_open_edit,
+                                onclick: {
+                                    let src_opt = selected_source_for_header.clone();
+                                    move |_| {
+                                        if let Some(ref s) = src_opt {
+                                            open_source_edit_dialog(
+                                                s,
+                                                editing_source_id,
+                                                form_name,
+                                                form_path,
+                                                form_error,
+                                                modal_is_edit,
+                                                is_modal_open,
+                                            );
+                                        }
+                                    }
+                                },
                                 title: "Edit Source Name and Path",
                                 "✎ Edit"
                             }
@@ -393,12 +446,17 @@ pub fn TabSources() -> Element {
                                     form_name.set(e.value());
                                     form_error.set(None);
                                 },
-                                onkeydown: {
-                                    let mut save = on_save_modal;
-                                    move |e| {
-                                        if e.key() == Key::Enter {
-                                            save();
-                                        }
+                                onkeydown: move |e| {
+                                    if e.key() == Key::Enter {
+                                        save_source_modal(
+                                            state,
+                                            is_modal_open,
+                                            modal_is_edit,
+                                            editing_source_id,
+                                            form_name,
+                                            form_path,
+                                            form_error,
+                                        );
                                     }
                                 },
                             }
@@ -418,19 +476,43 @@ pub fn TabSources() -> Element {
                                         form_path.set(e.value());
                                         form_error.set(None);
                                     },
-                                    onkeydown: {
-                                        let mut save = on_save_modal;
-                                        move |e| {
-                                            if e.key() == Key::Enter {
-                                                save();
-                                            }
+                                    onkeydown: move |e| {
+                                        if e.key() == Key::Enter {
+                                            save_source_modal(
+                                                state,
+                                                is_modal_open,
+                                                modal_is_edit,
+                                                editing_source_id,
+                                                form_name,
+                                                form_path,
+                                                form_error,
+                                            );
                                         }
                                     },
                                 }
                                 button {
                                     class: "btn btn-secondary",
                                     r#type: "button",
-                                    onclick: on_browse_folder,
+                                    onclick: move |_| {
+                                        let cur_path = form_path();
+                                        spawn(async move {
+                                            let start = if !cur_path.is_empty() {
+                                                Some(PathBuf::from(&cur_path))
+                                            } else {
+                                                None
+                                            };
+                                            if let Some(folder) = pick_folder("Select Source Directory", start.as_deref()).await {
+                                                let folder_str = folder.to_string_lossy().to_string();
+                                                form_path.set(folder_str);
+                                                if form_name().trim().is_empty() {
+                                                    if let Some(basename) = folder.file_name() {
+                                                        form_name.set(basename.to_string_lossy().to_string());
+                                                    }
+                                                }
+                                                form_error.set(None);
+                                            }
+                                        });
+                                    },
                                     "Browse..."
                                 }
                             }
@@ -451,7 +533,17 @@ pub fn TabSources() -> Element {
                         button {
                             class: "btn btn-primary",
                             r#type: "button",
-                            onclick: move |_| on_save_modal(),
+                            onclick: move |_| {
+                                save_source_modal(
+                                    state,
+                                    is_modal_open,
+                                    modal_is_edit,
+                                    editing_source_id,
+                                    form_name,
+                                    form_path,
+                                    form_error,
+                                );
+                            },
                             if modal_is_edit() { "Save Changes" } else { "Add Source" }
                         }
                     }

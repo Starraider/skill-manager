@@ -9,6 +9,113 @@ use crate::services::config_store::{expand_tilde, save_config};
 use crate::services::deployer::remove_skill_from_target;
 use crate::services::fs_scanner::scan_installed_skills;
 
+fn open_target_add_dialog(
+    mut editing_id: Signal<Option<String>>,
+    mut name: Signal<String>,
+    mut path: Signal<String>,
+    mut error: Signal<Option<String>>,
+    mut is_edit: Signal<bool>,
+    mut is_open: Signal<bool>,
+) {
+    editing_id.set(None);
+    name.set(String::new());
+    path.set(String::new());
+    error.set(None);
+    is_edit.set(false);
+    is_open.set(true);
+}
+
+fn open_target_edit_dialog(
+    target: &TargetConfig,
+    mut editing_id: Signal<Option<String>>,
+    mut name: Signal<String>,
+    mut path: Signal<String>,
+    mut error: Signal<Option<String>>,
+    mut is_edit: Signal<bool>,
+    mut is_open: Signal<bool>,
+) {
+    editing_id.set(Some(target.id.clone()));
+    name.set(target.name.clone());
+    path.set(if target.is_global {
+        "Global user harness directories".to_string()
+    } else {
+        target.path.to_string_lossy().to_string()
+    });
+    error.set(None);
+    is_edit.set(true);
+    is_open.set(true);
+}
+
+fn save_target_modal(
+    mut state: AppState,
+    mut is_modal_open: Signal<bool>,
+    modal_is_edit: Signal<bool>,
+    editing_target_id: Signal<Option<String>>,
+    active_target_id: Option<String>,
+    form_name: Signal<String>,
+    form_path: Signal<String>,
+    mut form_error: Signal<Option<String>>,
+) {
+    let trimmed_name = form_name().trim().to_string();
+    let trimmed_path = form_path().trim().to_string();
+
+    if trimmed_name.is_empty() {
+        form_error.set(Some("Please enter a name for the destination folder.".to_string()));
+        return;
+    }
+
+    let is_editing_global = modal_is_edit()
+        && editing_target_id().as_deref() == Some("global");
+
+    if !is_editing_global && trimmed_path.is_empty() {
+        form_error.set(Some("Please specify a directory path.".to_string()));
+        return;
+    }
+
+    let mut current_config = (state.config)();
+
+    if modal_is_edit() {
+        let target_id_to_update = editing_target_id().or(active_target_id);
+        if let Some(ref id) = target_id_to_update {
+            if let Some(t) = current_config.targets.iter_mut().find(|t| t.id == *id) {
+                t.name = trimmed_name.clone();
+                if !t.is_global {
+                    t.path = PathBuf::from(trimmed_path);
+                }
+            }
+        }
+        let _ = save_config(&current_config);
+        state.config.set(current_config);
+        state
+            .status_message
+            .set(Some(format!("Updated destination '{}'.", trimmed_name)));
+    } else {
+        let id = format!(
+            "target-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis()
+        );
+        let new_target = TargetConfig {
+            id: id.clone(),
+            name: trimmed_name.clone(),
+            path: PathBuf::from(trimmed_path),
+            is_global: false,
+            is_pinned: false,
+        };
+        current_config.targets.push(new_target);
+        let _ = save_config(&current_config);
+        state.config.set(current_config);
+        state.selected_target_id.set(Some(id));
+        state
+            .status_message
+            .set(Some(format!("Added destination '{}'.", trimmed_name)));
+    }
+
+    is_modal_open.set(false);
+}
+
 #[component]
 pub fn TabTargets() -> Element {
     let mut state: AppState = use_context();
@@ -43,118 +150,6 @@ pub fn TabTargets() -> Element {
     let mut form_path = use_signal(String::new);
     let mut form_error = use_signal(|| None::<String>);
 
-    let on_open_add = move |_| {
-        editing_target_id.set(None);
-        form_name.set(String::new());
-        form_path.set(String::new());
-        form_error.set(None);
-        modal_is_edit.set(false);
-        is_modal_open.set(true);
-    };
-
-    let on_open_edit = {
-        let target_opt = selected_target.clone();
-        move |_| {
-            if let Some(ref t) = target_opt {
-                editing_target_id.set(Some(t.id.clone()));
-                form_name.set(t.name.clone());
-                form_path.set(if t.is_global {
-                    "Global user harness directories".to_string()
-                } else {
-                    t.path.to_string_lossy().to_string()
-                });
-                form_error.set(None);
-                modal_is_edit.set(true);
-                is_modal_open.set(true);
-            }
-        }
-    };
-
-    let on_browse_folder = move |_| {
-        let cur_path = form_path();
-        spawn(async move {
-            let start = if !cur_path.is_empty() {
-                Some(PathBuf::from(&cur_path))
-            } else {
-                None
-            };
-            if let Some(folder) = pick_folder("Select Project Target Directory", start.as_deref()).await {
-                let folder_str = folder.to_string_lossy().to_string();
-                form_path.set(folder_str);
-                if form_name().trim().is_empty() {
-                    if let Some(basename) = folder.file_name() {
-                        form_name.set(basename.to_string_lossy().to_string());
-                    }
-                }
-                form_error.set(None);
-            }
-        });
-    };
-
-    let on_save_modal = {
-        let cur_active_id = active_target_id.clone();
-        move || {
-            let trimmed_name = form_name().trim().to_string();
-            let trimmed_path = form_path().trim().to_string();
-
-            if trimmed_name.is_empty() {
-                form_error.set(Some("Please enter a name for the destination folder.".to_string()));
-                return;
-            }
-
-            let is_editing_global = modal_is_edit()
-                && editing_target_id().as_deref() == Some("global");
-
-            if !is_editing_global && trimmed_path.is_empty() {
-                form_error.set(Some("Please specify a directory path.".to_string()));
-                return;
-            }
-
-            let mut current_config = (state.config)();
-
-            if modal_is_edit() {
-                let target_id_to_update = editing_target_id().or_else(|| cur_active_id.clone());
-                if let Some(ref id) = target_id_to_update {
-                    if let Some(t) = current_config.targets.iter_mut().find(|t| t.id == *id) {
-                        t.name = trimmed_name.clone();
-                        if !t.is_global {
-                            t.path = PathBuf::from(trimmed_path);
-                        }
-                    }
-                }
-                let _ = save_config(&current_config);
-                state.config.set(current_config);
-                state
-                    .status_message
-                    .set(Some(format!("Updated destination '{}'.", trimmed_name)));
-            } else {
-                let id = format!(
-                    "target-{}",
-                    std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
-                        .as_millis()
-                );
-                let new_target = TargetConfig {
-                    id: id.clone(),
-                    name: trimmed_name.clone(),
-                    path: PathBuf::from(trimmed_path),
-                    is_global: false,
-                    is_pinned: false,
-                };
-                current_config.targets.push(new_target);
-                let _ = save_config(&current_config);
-                state.config.set(current_config);
-                state.selected_target_id.set(Some(id));
-                state
-                    .status_message
-                    .set(Some(format!("Added destination '{}'.", trimmed_name)));
-            }
-
-            is_modal_open.set(false);
-        }
-    };
-
     let on_remove_target = {
         let current_target = selected_target.clone();
         move |_| {
@@ -173,6 +168,9 @@ pub fn TabTargets() -> Element {
         }
     };
 
+    let selected_target_for_header = selected_target.clone();
+    let is_editing_global = modal_is_edit() && editing_target_id().as_deref() == Some("global");
+
     rsx! {
         div { class: "split-layout",
             // Left Pane: Targets List
@@ -182,12 +180,36 @@ pub fn TabTargets() -> Element {
                     div { style: "display: flex; gap: 6px;",
                         button {
                             class: "btn btn-primary btn-sm",
-                            onclick: on_open_add,
+                            onclick: move |_| {
+                                open_target_add_dialog(
+                                    editing_target_id,
+                                    form_name,
+                                    form_path,
+                                    form_error,
+                                    modal_is_edit,
+                                    is_modal_open,
+                                );
+                            },
                             "+ Add"
                         }
                         button {
                             class: "btn btn-secondary btn-sm",
-                            onclick: on_open_edit,
+                            onclick: {
+                                let target_opt = selected_target.clone();
+                                move |_| {
+                                    if let Some(ref t) = target_opt {
+                                        open_target_edit_dialog(
+                                            t,
+                                            editing_target_id,
+                                            form_name,
+                                            form_path,
+                                            form_error,
+                                            modal_is_edit,
+                                            is_modal_open,
+                                        );
+                                    }
+                                }
+                            },
                             disabled: selected_target.is_none(),
                             "Edit"
                         }
@@ -213,19 +235,18 @@ pub fn TabTargets() -> Element {
                                     onclick: move |_| {
                                         state.selected_target_id.set(Some(tid.clone()));
                                     },
-                                    ondblclick: {
+                                    ondoubleclick: {
                                         let t = t_clone.clone();
                                         move |_| {
-                                            editing_target_id.set(Some(t.id.clone()));
-                                            form_name.set(t.name.clone());
-                                            form_path.set(if t.is_global {
-                                                "Global user harness directories".to_string()
-                                            } else {
-                                                t.path.to_string_lossy().to_string()
-                                            });
-                                            form_error.set(None);
-                                            modal_is_edit.set(true);
-                                            is_modal_open.set(true);
+                                            open_target_edit_dialog(
+                                                &t,
+                                                editing_target_id,
+                                                form_name,
+                                                form_path,
+                                                form_error,
+                                                modal_is_edit,
+                                                is_modal_open,
+                                            );
                                         }
                                     },
                                     div { class: "item-header",
@@ -239,16 +260,15 @@ pub fn TabTargets() -> Element {
                                                     move |e| {
                                                         e.stop_propagation();
                                                         state.selected_target_id.set(Some(t.id.clone()));
-                                                        editing_target_id.set(Some(t.id.clone()));
-                                                        form_name.set(t.name.clone());
-                                                        form_path.set(if t.is_global {
-                                                            "Global user harness directories".to_string()
-                                                        } else {
-                                                            t.path.to_string_lossy().to_string()
-                                                        });
-                                                        form_error.set(None);
-                                                        modal_is_edit.set(true);
-                                                        is_modal_open.set(true);
+                                                        open_target_edit_dialog(
+                                                            &t,
+                                                            editing_target_id,
+                                                            form_name,
+                                                            form_path,
+                                                            form_error,
+                                                            modal_is_edit,
+                                                            is_modal_open,
+                                                        );
                                                     }
                                                 },
                                                 "✎"
@@ -282,10 +302,25 @@ pub fn TabTargets() -> Element {
                                 "Installed Skills"
                             }
                         }
-                        if selected_target.is_some() {
+                        if selected_target_for_header.is_some() {
                             button {
                                 class: "btn btn-secondary btn-sm",
-                                onclick: on_open_edit,
+                                onclick: {
+                                    let target_opt = selected_target_for_header.clone();
+                                    move |_| {
+                                        if let Some(ref t) = target_opt {
+                                            open_target_edit_dialog(
+                                                t,
+                                                editing_target_id,
+                                                form_name,
+                                                form_path,
+                                                form_error,
+                                                modal_is_edit,
+                                                is_modal_open,
+                                            );
+                                        }
+                                    }
+                                },
                                 title: "Edit Target Name and Path",
                                 "✎ Edit"
                             }
@@ -385,110 +420,157 @@ pub fn TabTargets() -> Element {
 
         // Add / Edit Target Modal
         if is_modal_open() {
-            let is_editing_global = modal_is_edit()
-                && editing_target_id().as_deref() == Some("global");
-            rsx! {
+            div {
+                class: "modal-backdrop",
+                onclick: move |_| is_modal_open.set(false),
                 div {
-                    class: "modal-backdrop",
-                    onclick: move |_| is_modal_open.set(false),
-                    div {
-                        class: "modal-content",
-                        onclick: move |e| e.stop_propagation(),
-                        div { class: "modal-header",
-                            h3 { class: "modal-title",
-                                if modal_is_edit() { "Edit Destination Folder" } else { "Add Destination Folder" }
-                            }
-                            button {
-                                class: "btn btn-secondary btn-sm",
-                                onclick: move |_| is_modal_open.set(false),
-                                "✕"
-                            }
+                    class: "modal-content",
+                    onclick: move |e| e.stop_propagation(),
+                    div { class: "modal-header",
+                        h3 { class: "modal-title",
+                            if modal_is_edit() { "Edit Destination Folder" } else { "Add Destination Folder" }
                         }
-                        div { class: "modal-body",
-                            div { class: "form-group",
-                                label { class: "form-label", "Destination Name" }
-                                input {
-                                    class: "form-control",
-                                    r#type: "text",
-                                    placeholder: "e.g. My Project",
-                                    value: "{form_name}",
-                                    oninput: move |e| {
-                                        form_name.set(e.value());
-                                        form_error.set(None);
-                                    },
-                                    onkeydown: {
-                                        let mut save = on_save_modal;
-                                        move |e| {
-                                            if e.key() == Key::Enter {
-                                                save();
-                                            }
-                                        }
-                                    },
-                                }
-                                p { style: "font-size: 11px; color: var(--text-muted); margin-top: 4px;",
-                                    "A custom display name independent of the filesystem path."
-                                }
-                            }
-                            div { class: "form-group",
-                                label { class: "form-label", "Destination Path" }
-                                if !is_editing_global {
-                                    div { class: "input-with-button",
-                                        input {
-                                            class: "form-control",
-                                            r#type: "text",
-                                            placeholder: "e.g. /Users/svenkalbhenn/Projekte/kunden-projekt",
-                                            value: "{form_path}",
-                                            oninput: move |e| {
-                                                form_path.set(e.value());
-                                                form_error.set(None);
-                                            },
-                                            onkeydown: {
-                                                let mut save = on_save_modal;
-                                                move |e| {
-                                                    if e.key() == Key::Enter {
-                                                        save();
-                                                    }
-                                                }
-                                            },
-                                        }
-                                        button {
-                                            class: "btn btn-secondary",
-                                            r#type: "button",
-                                            onclick: on_browse_folder,
-                                            "Browse..."
+                        button {
+                            class: "btn btn-secondary btn-sm",
+                            onclick: move |_| is_modal_open.set(false),
+                            "✕"
+                        }
+                    }
+                    div { class: "modal-body",
+                        div { class: "form-group",
+                            label { class: "form-label", "Destination Name" }
+                            input {
+                                class: "form-control",
+                                r#type: "text",
+                                placeholder: "e.g. My Project",
+                                value: "{form_name}",
+                                oninput: move |e| {
+                                    form_name.set(e.value());
+                                    form_error.set(None);
+                                },
+                                onkeydown: {
+                                    let active_id = active_target_id.clone();
+                                    move |e| {
+                                        if e.key() == Key::Enter {
+                                            save_target_modal(
+                                                state,
+                                                is_modal_open,
+                                                modal_is_edit,
+                                                editing_target_id,
+                                                active_id.clone(),
+                                                form_name,
+                                                form_path,
+                                                form_error,
+                                            );
                                         }
                                     }
-                                } else {
+                                },
+                            }
+                            p { style: "font-size: 11px; color: var(--text-muted); margin-top: 4px;",
+                                "A custom display name independent of the filesystem path."
+                            }
+                        }
+                        div { class: "form-group",
+                            label { class: "form-label", "Destination Path" }
+                            if !is_editing_global {
+                                div { class: "input-with-button",
                                     input {
                                         class: "form-control",
                                         r#type: "text",
+                                        placeholder: "e.g. /Users/svenkalbhenn/Projekte/kunden-projekt",
                                         value: "{form_path}",
-                                        disabled: true,
+                                        oninput: move |e| {
+                                            form_path.set(e.value());
+                                            form_error.set(None);
+                                        },
+                                        onkeydown: {
+                                            let active_id = active_target_id.clone();
+                                            move |e| {
+                                                if e.key() == Key::Enter {
+                                                    save_target_modal(
+                                                        state,
+                                                        is_modal_open,
+                                                        modal_is_edit,
+                                                        editing_target_id,
+                                                        active_id.clone(),
+                                                        form_name,
+                                                        form_path,
+                                                        form_error,
+                                                    );
+                                                }
+                                            }
+                                        },
                                     }
-                                    p { style: "font-size: 11px; color: var(--text-muted); margin-top: 4px;",
-                                        "Global target paths are managed per-harness in the Harnesses tab."
+                                    button {
+                                        class: "btn btn-secondary",
+                                        r#type: "button",
+                                        onclick: move |_| {
+                                            let cur_path = form_path();
+                                            spawn(async move {
+                                                let start = if !cur_path.is_empty() {
+                                                    Some(PathBuf::from(&cur_path))
+                                                } else {
+                                                    None
+                                                };
+                                                if let Some(folder) = pick_folder("Select Project Target Directory", start.as_deref()).await {
+                                                    let folder_str = folder.to_string_lossy().to_string();
+                                                    form_path.set(folder_str);
+                                                    if form_name().trim().is_empty() {
+                                                        if let Some(basename) = folder.file_name() {
+                                                            form_name.set(basename.to_string_lossy().to_string());
+                                                        }
+                                                    }
+                                                    form_error.set(None);
+                                                }
+                                            });
+                                        },
+                                        "Browse..."
                                     }
                                 }
-                            }
-                            if let Some(ref err) = form_error() {
-                                div { style: "color: var(--danger); font-size: 12px; margin-top: 8px; font-weight: 500;",
-                                    "{err}"
+                            } else {
+                                input {
+                                    class: "form-control",
+                                    r#type: "text",
+                                    value: "{form_path}",
+                                    disabled: true,
+                                }
+                                p { style: "font-size: 11px; color: var(--text-muted); margin-top: 4px;",
+                                    "Global target paths are managed per-harness in the Harnesses tab."
                                 }
                             }
                         }
-                        div { class: "modal-footer",
-                            button {
-                                class: "btn btn-secondary",
-                                r#type: "button",
-                                onclick: move |_| is_modal_open.set(false),
-                                "Cancel"
+                        if let Some(ref err) = form_error() {
+                            div { style: "color: var(--danger); font-size: 12px; margin-top: 8px; font-weight: 500;",
+                                "{err}"
                             }
-                            button {
-                                class: "btn btn-primary",
-                                r#type: "button",
-                                onclick: move |_| on_save_modal(),
-                                if modal_is_edit() { "Save Changes" } else { "Add Destination" }
-                            }
+                        }
+                    }
+                    div { class: "modal-footer",
+                        button {
+                            class: "btn btn-secondary",
+                            r#type: "button",
+                            onclick: move |_| is_modal_open.set(false),
+                            "Cancel"
+                        }
+                        button {
+                            class: "btn btn-primary",
+                            r#type: "button",
+                            onclick: {
+                                let active_id = active_target_id.clone();
+                                move |_| {
+                                    save_target_modal(
+                                        state,
+                                        is_modal_open,
+                                        modal_is_edit,
+                                        editing_target_id,
+                                        active_id.clone(),
+                                        form_name,
+                                        form_path,
+                                        form_error,
+                                    );
+                                }
+                            },
+                            if modal_is_edit() { "Save Changes" } else { "Add Destination" }
                         }
                     }
                 }
