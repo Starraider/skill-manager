@@ -208,7 +208,8 @@ fn test_user_defined_names_remain_independent_of_app_language() {
     let mut loaded = load_config_from_path(&config_path).expect("Load should succeed");
     assert_eq!(loaded.sources[0].name, "Meine benutzerdefinierte Quelle");
     assert_eq!(loaded.targets[1].name, "Kundenprojekt Hauptseite");
-    assert_eq!(loaded.harnesses[4].name, "Custom Harness Environment");
+    let custom_harness_idx = loaded.harnesses.len() - 1;
+    assert_eq!(loaded.harnesses[custom_harness_idx].name, "Custom Harness Environment");
 
     // Switch UI language to English - user text fields remain unaffected
     loaded.language = Language::English;
@@ -218,7 +219,7 @@ fn test_user_defined_names_remain_independent_of_app_language() {
     assert_eq!(reloaded.language, Language::English);
     assert_eq!(reloaded.sources[0].name, "Meine benutzerdefinierte Quelle");
     assert_eq!(reloaded.targets[1].name, "Kundenprojekt Hauptseite");
-    assert_eq!(reloaded.harnesses[4].name, "Custom Harness Environment");
+    assert_eq!(reloaded.harnesses[custom_harness_idx].name, "Custom Harness Environment");
 }
 
 #[test]

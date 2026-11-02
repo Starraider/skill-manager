@@ -33,7 +33,7 @@ fn test_default_config_seeding_when_file_missing() {
     let loaded = load_config_from_path(&config_path).expect("Should succeed with default config");
 
     assert_eq!(loaded, AppConfig::default_seeded());
-    assert_eq!(loaded.harnesses.len(), 4);
+    assert_eq!(loaded.harnesses.len(), 11);
     assert!(loaded.targets.iter().any(|t| t.is_global && t.is_pinned));
 }
 
