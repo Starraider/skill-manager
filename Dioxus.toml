@@ -1,0 +1,8 @@
+[application]
+name = "Skill-Manager"
+default_platform = "desktop"
+executable = "skill-manager"
+
+[desktop]
+bundle_identifier = "com.skillmanager.desktop"
+
