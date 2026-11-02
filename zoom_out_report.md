@@ -89,3 +89,4 @@ The design document establishes clear context and correctly targets the fragment
 * **Affected Scope**: Lines 230-231, 408 (`src/services/config_store.rs`)
 * **Simplicity Rationale**:
   Storing unexpanded tilde strings (`~/.claude/skills`) in `PathBuf` and requiring an `expand_tilde` helper at every file access call site is error-prone. Since native file pickers (`rfd`) return absolute paths, expanding default paths once during initial configuration creation ensures all stored paths are always valid, absolute `PathBuf`s, eliminating runtime expansion logic entirely.
+
