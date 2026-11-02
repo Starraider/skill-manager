@@ -1,8 +1,13 @@
+use crate::services::i18n::Language;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Default)]
 pub struct AppConfig {
+    #[serde(default)]
+    pub language: Language,
+    #[serde(default)]
+    pub left_pane_width: Option<f64>,
     pub sources: Vec<SourceConfig>,
     pub targets: Vec<TargetConfig>,
     pub harnesses: Vec<HarnessConfig>,
@@ -11,6 +16,8 @@ pub struct AppConfig {
 impl AppConfig {
     pub fn default_seeded() -> Self {
         Self {
+            language: Language::English,
+            left_pane_width: None,
             sources: Vec::new(),
             targets: vec![TargetConfig {
                 id: "global".to_string(),

@@ -1,12 +1,14 @@
 use crate::models::skill::Skill;
 use crate::models::state::AppState;
 use crate::services::deployer::deploy_skills;
+use crate::services::i18n::{t, tr};
 use dioxus::prelude::*;
 use std::collections::HashSet;
 
 #[component]
 pub fn CopyModal(skills: Vec<Skill>) -> Element {
     let mut state: AppState = use_context();
+    let lang = (state.current_language)();
     let config = (state.config)();
     let selected_skill_names = (state.selected_skill_names)();
 
@@ -58,15 +60,24 @@ pub fn CopyModal(skills: Vec<Skill>) -> Element {
                 .await
                 .unwrap_or_default();
 
-                let mut msg = format!(
-                    "Copied {} skill destinations.",
-                    deploy_result.copied_paths.len()
+                let mut msg = tr(
+                    lang,
+                    "copy_modal.msg_copied",
+                    &[("count", &deploy_result.copied_paths.len().to_string())],
                 );
                 if !deploy_result.warnings.is_empty() {
-                    msg.push_str(&format!(" Warnings: {}.", deploy_result.warnings.len()));
+                    msg.push_str(&tr(
+                        lang,
+                        "copy_modal.msg_warnings",
+                        &[("count", &deploy_result.warnings.len().to_string())],
+                    ));
                 }
                 if !deploy_result.errors.is_empty() {
-                    msg.push_str(&format!(" Errors: {}.", deploy_result.errors.len()));
+                    msg.push_str(&tr(
+                        lang,
+                        "copy_modal.msg_errors",
+                        &[("count", &deploy_result.errors.len().to_string())],
+                    ));
                 }
 
                 state.status_message.set(Some(msg));
@@ -76,21 +87,27 @@ pub fn CopyModal(skills: Vec<Skill>) -> Element {
         }
     };
 
+    let deploy_btn_text = if is_deploying() {
+        t(lang, "copy_modal.btn_deploying")
+    } else {
+        t(lang, "copy_modal.btn_deploy")
+    };
+
     rsx! {
         div { class: "modal-backdrop",
             div { class: "modal-content",
                 div { class: "modal-header",
-                    h3 { class: "modal-title", "Copy Skills to Targets" }
+                    h3 { class: "modal-title", "{t(lang, \"copy_modal.title\")}" }
                     button {
                         class: "btn btn-secondary btn-sm",
                         onclick: close_modal,
-                        "✕"
+                        "{t(lang, \"common.close\")}"
                     }
                 }
                 div { class: "modal-body",
                     div { style: "margin-bottom: 16px;",
                         p { style: "font-weight: 500; margin-bottom: 6px;",
-                            "Skills to Copy ({selected_skills.len()}):"
+                            "{tr(lang, \"copy_modal.skills_to_copy\", &[(\"count\", &selected_skills.len().to_string())])}"
                         }
                         div { style: "display: flex; flex-wrap: wrap; gap: 6px;",
                             for skill in &selected_skills {
@@ -99,7 +116,7 @@ pub fn CopyModal(skills: Vec<Skill>) -> Element {
                         }
                     }
 
-                    p { style: "font-weight: 500; margin-bottom: 8px;", "Select Destination Targets:" }
+                    p { style: "font-weight: 500; margin-bottom: 8px;", "{t(lang, \"copy_modal.select_targets\")}" }
                     div { style: "display: flex; flex-direction: column; gap: 8px;",
                         for target in &config.targets {
                             {
@@ -129,7 +146,7 @@ pub fn CopyModal(skills: Vec<Skill>) -> Element {
                                             div { style: "font-weight: 600;",
                                                 "{target.name}"
                                                 if target.is_global {
-                                                    span { style: "margin-left: 6px;", class: "badge badge-pinned", "Global" }
+                                                    span { style: "margin-left: 6px;", class: "badge badge-pinned", "{t(lang, \"common.global\")}" }
                                                 }
                                             }
                                             if !target.is_global {
@@ -149,16 +166,17 @@ pub fn CopyModal(skills: Vec<Skill>) -> Element {
                         class: "btn btn-secondary",
                         onclick: close_modal,
                         disabled: is_deploying(),
-                        "Cancel"
+                        "{t(lang, \"common.cancel\")}"
                     }
                     button {
                         class: "btn btn-primary",
                         onclick: on_confirm,
                         disabled: is_deploying() || selected_target_ids().is_empty(),
-                        if is_deploying() { "Deploying..." } else { "Deploy Skills" }
+                        "{deploy_btn_text}"
                     }
                 }
             }
         }
     }
 }
+

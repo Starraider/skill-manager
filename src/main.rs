@@ -9,6 +9,14 @@ use skill_manager::services::config_store::load_config;
 #[component]
 fn App() -> Element {
     let initial_config = use_signal(|| load_config().unwrap_or_default());
+    let initial_lang = initial_config().language;
+    let initial_width = initial_config()
+        .left_pane_width
+        .unwrap_or_else(|| skill_manager::services::i18n::default_left_pane_width(initial_lang))
+        .max(skill_manager::services::i18n::min_left_pane_width(initial_lang));
+    let left_pane_width = use_signal(|| initial_width);
+    let current_language = use_signal(|| initial_lang);
+    let is_language_dialog_open = use_signal(|| false);
     let active_tab = use_signal(|| ActiveTab::Sources);
     let selected_source_id = use_signal(|| initial_config().sources.first().map(|s| s.id.clone()));
     let selected_target_id = use_signal(|| initial_config().targets.first().map(|t| t.id.clone()));
@@ -24,6 +32,9 @@ fn App() -> Element {
         selected_skill_names,
         is_copy_modal_open,
         status_message,
+        current_language,
+        is_language_dialog_open,
+        left_pane_width,
     };
 
     use_context_provider(|| state);

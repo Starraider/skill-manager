@@ -122,12 +122,12 @@ body {
 }
 
 .pane-left {
-  width: 320px;
   flex-shrink: 0;
   border-right: 1px solid var(--border-color);
   background-color: var(--surface-color);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .pane-right {
@@ -136,6 +136,7 @@ body {
   flex-direction: column;
   background-color: var(--bg-color);
   overflow: hidden;
+  min-width: 300px;
 }
 
 .pane-header {
@@ -144,12 +145,68 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.pane-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .pane-title {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-main);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Splitter / Resizer */
+.resize-handle {
+  width: 8px;
+  margin-left: -4px;
+  margin-right: -4px;
+  z-index: 20;
+  cursor: col-resize;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  background: transparent;
+  transition: background-color 0.15s ease;
+}
+
+.resize-handle:hover,
+.resize-handle.active {
+  background-color: var(--accent);
+}
+
+.resize-handle-line {
+  width: 1px;
+  height: 100%;
+  background-color: var(--border-color);
+  pointer-events: none;
+}
+
+.resize-handle:hover .resize-handle-line,
+.resize-handle.active .resize-handle-line {
+  opacity: 0;
+}
+
+.resize-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 99999;
+  cursor: col-resize;
+  user-select: none;
 }
 
 .pane-body {
@@ -211,6 +268,8 @@ body {
   cursor: pointer;
   border: 1px solid transparent;
   transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .btn-primary {
@@ -244,6 +303,8 @@ body {
 .btn-sm {
   padding: 4px 8px;
   font-size: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .btn:disabled {
@@ -457,4 +518,144 @@ tr:hover td {
   text-align: center;
   gap: 12px;
 }
+
+/* Header Menu & Dropdowns */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 100%;
+}
+
+.header-menu-divider {
+  width: 1px;
+  height: 20px;
+  background-color: var(--border-color);
+}
+
+.menu-dropdown-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.menu-top-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.menu-top-btn:hover {
+  color: var(--text-main);
+  background-color: var(--surface-hover);
+}
+
+.menu-top-btn.active {
+  color: var(--text-main);
+  background-color: var(--surface-hover);
+  border-color: var(--border-color);
+}
+
+.menu-chevron {
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+.dropdown-backdrop-transparent {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  cursor: default;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 170px;
+  background-color: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+  padding: 6px;
+  z-index: 101;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dropdown-item {
+  background: transparent;
+  border: none;
+  color: var(--text-main);
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.12s ease;
+  width: 100%;
+}
+
+.dropdown-item:hover {
+  background-color: var(--surface-hover);
+}
+
+.dropdown-item.selected {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.dropdown-check {
+  display: inline-block;
+  width: 16px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background-color: var(--border-color);
+  margin: 4px 0;
+}
+
+.dropdown-action {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.language-option-card {
+  padding: 12px 14px;
+  background: var(--surface-hover);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.language-option-card:hover {
+  background: var(--surface-active);
+  border-color: var(--accent);
+}
+
+.language-option-card.selected {
+  background: var(--surface-active);
+  border-color: var(--accent);
+}
+
 

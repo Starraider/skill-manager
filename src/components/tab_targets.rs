@@ -2,12 +2,14 @@ use dioxus::prelude::*;
 use std::path::PathBuf;
 
 use crate::components::common::{pick_folder, HarnessBadge, PinnedBadge, StatusPill};
+use crate::components::resize_handle::ResizeHandle;
 use crate::models::config::TargetConfig;
 use crate::models::skill::InstalledSkill;
 use crate::models::state::AppState;
 use crate::services::config_store::{expand_tilde, save_config};
 use crate::services::deployer::remove_skill_from_target;
 use crate::services::fs_scanner::scan_installed_skills;
+use crate::services::i18n::{min_left_pane_width, t, tr};
 
 fn open_target_add_dialog(
     mut editing_id: Signal<Option<String>>,
@@ -56,11 +58,12 @@ fn save_target_modal(
     form_path: Signal<String>,
     mut form_error: Signal<Option<String>>,
 ) {
+    let lang = (state.current_language)();
     let trimmed_name = form_name().trim().to_string();
     let trimmed_path = form_path().trim().to_string();
 
     if trimmed_name.is_empty() {
-        form_error.set(Some("Please enter a name for the destination folder.".to_string()));
+        form_error.set(Some(t(lang, "targets.err_name_required")));
         return;
     }
 
@@ -68,7 +71,7 @@ fn save_target_modal(
         && editing_target_id().as_deref() == Some("global");
 
     if !is_editing_global && trimmed_path.is_empty() {
-        form_error.set(Some("Please specify a directory path.".to_string()));
+        form_error.set(Some(t(lang, "targets.err_path_required")));
         return;
     }
 
@@ -88,7 +91,7 @@ fn save_target_modal(
         state.config.set(current_config);
         state
             .status_message
-            .set(Some(format!("Updated destination '{}'.", trimmed_name)));
+            .set(Some(tr(lang, "targets.msg_updated", &[("name", &trimmed_name)])));
     } else {
         let id = format!(
             "target-{}",
@@ -110,7 +113,7 @@ fn save_target_modal(
         state.selected_target_id.set(Some(id));
         state
             .status_message
-            .set(Some(format!("Added destination '{}'.", trimmed_name)));
+            .set(Some(tr(lang, "targets.msg_added", &[("name", &trimmed_name)])));
     }
 
     is_modal_open.set(false);
@@ -119,6 +122,7 @@ fn save_target_modal(
 #[component]
 pub fn TabTargets() -> Element {
     let mut state: AppState = use_context();
+    let lang = (state.current_language)();
     let config = (state.config)();
     let selected_target_id = (state.selected_target_id)();
 
@@ -170,14 +174,23 @@ pub fn TabTargets() -> Element {
 
     let selected_target_for_header = selected_target.clone();
     let is_editing_global = modal_is_edit() && editing_target_id().as_deref() == Some("global");
+    let pane_width = (state.left_pane_width)();
+    let min_width = min_left_pane_width(lang);
+    let installed_title = if let Some(ref target) = selected_target {
+        tr(lang, "targets.skills_heading", &[("name", &target.name), ("count", &installed_skills.len().to_string())])
+    } else {
+        t(lang, "targets.installed_skills")
+    };
 
     rsx! {
         div { class: "split-layout",
             // Left Pane: Targets List
-            div { class: "pane-left",
+            div {
+                class: "pane-left",
+                style: "width: {pane_width}px; min-width: {min_width}px;",
                 div { class: "pane-header",
-                    span { class: "pane-title", "Target Environments" }
-                    div { style: "display: flex; gap: 6px;",
+                    span { class: "pane-title", "{t(lang, \"targets.title\")}" }
+                    div { class: "pane-header-actions",
                         button {
                             class: "btn btn-primary btn-sm",
                             onclick: move |_| {
@@ -190,7 +203,7 @@ pub fn TabTargets() -> Element {
                                     is_modal_open,
                                 );
                             },
-                            "+ Add"
+                            "{t(lang, \"targets.btn_add\")}"
                         }
                         button {
                             class: "btn btn-secondary btn-sm",
@@ -211,13 +224,13 @@ pub fn TabTargets() -> Element {
                                 }
                             },
                             disabled: selected_target.is_none(),
-                            "Edit"
+                            "{t(lang, \"targets.btn_edit\")}"
                         }
                         button {
                             class: "btn btn-danger btn-sm",
                             onclick: on_remove_target,
                             disabled: selected_target.as_ref().map(|t| t.is_pinned).unwrap_or(true),
-                            "Remove"
+                            "{t(lang, \"targets.btn_remove\")}"
                         }
                     }
                 }
@@ -254,7 +267,7 @@ pub fn TabTargets() -> Element {
                                             span { class: "item-name", "{target.name}" }
                                             button {
                                                 class: "btn-icon",
-                                                title: "Edit Name and Path",
+                                                title: "{t(lang, \"targets.tooltip_edit\")}",
                                                 onclick: {
                                                     let t = t_clone.clone();
                                                     move |e| {
@@ -280,7 +293,7 @@ pub fn TabTargets() -> Element {
                                         StatusPill { active: is_active }
                                     }
                                     if target.is_global {
-                                        div { class: "item-path", "Global user harness directories" }
+                                        div { class: "item-path", "{t(lang, \"targets.global_path\")}" }
                                     } else {
                                         div { class: "item-path", "{target.path.display()}" }
                                     }
@@ -291,17 +304,14 @@ pub fn TabTargets() -> Element {
                 }
             }
 
+            // Draggable Resize Handle
+            ResizeHandle {}
+
             // Right Pane: Installed Skills
             div { class: "pane-right",
                 div { class: "pane-header",
                     div { style: "display: flex; align-items: center; gap: 10px;",
-                        span { class: "pane-title",
-                            if let Some(ref target) = selected_target {
-                                "Installed Skills in {target.name} ({installed_skills.len()})"
-                            } else {
-                                "Installed Skills"
-                            }
-                        }
+                        span { class: "pane-title", "{installed_title}" }
                         if selected_target_for_header.is_some() {
                             button {
                                 class: "btn btn-secondary btn-sm",
@@ -321,8 +331,8 @@ pub fn TabTargets() -> Element {
                                         }
                                     }
                                 },
-                                title: "Edit Target Name and Path",
-                                "✎ Edit"
+                                title: "{t(lang, \"targets.btn_edit_target_title\")}",
+                                "{t(lang, \"targets.btn_edit_target\")}"
                             }
                         }
                     }
@@ -331,21 +341,21 @@ pub fn TabTargets() -> Element {
                 div { class: "pane-body", style: "padding: 0;",
                     if selected_target.is_none() {
                         div { class: "empty-state",
-                            p { "Select a target on the left to inspect installed skills." }
+                            p { "{t(lang, \"targets.empty_select_prompt\")}" }
                         }
                     } else if installed_skills.is_empty() {
                         div { class: "empty-state",
-                            p { "No skills currently installed in this target." }
+                            p { "{t(lang, \"targets.empty_skills\")}" }
                         }
                     } else {
                         div { class: "table-container",
                             table {
                                 thead {
                                     tr {
-                                        th { "Skill Name" }
-                                        th { "Configured Harnesses" }
-                                        th { "Installations" }
-                                        th { style: "text-align: right;", "Actions" }
+                                        th { "{t(lang, \"targets.th_skill_name\")}" }
+                                        th { "{t(lang, \"targets.th_configured_harnesses\")}" }
+                                        th { "{t(lang, \"targets.th_installations\")}" }
+                                        th { style: "text-align: right;", "{t(lang, \"targets.th_actions\")}" }
                                     }
                                 }
                                 tbody {
@@ -363,7 +373,7 @@ pub fn TabTargets() -> Element {
                                                         }
                                                     }
                                                     td { style: "color: var(--text-muted); font-size: 12px;",
-                                                        "{skill.installed_paths.len()} path(s)"
+                                                        "{tr(lang, \"targets.paths_count\", &[(\"count\", &skill.installed_paths.len().to_string())])}"
                                                     }
                                                     td { style: "text-align: right;",
                                                         button {
@@ -386,24 +396,33 @@ pub fn TabTargets() -> Element {
 
                                                                             match res {
                                                                                 Ok(Ok(())) => {
-                                                                                    state.status_message.set(Some(format!(
-                                                                                        "Successfully removed skill '{}' from all harnesses.",
-                                                                                        skill_to_delete
+                                                                                    state.status_message.set(Some(tr(
+                                                                                        lang,
+                                                                                        "targets.msg_remove_success",
+                                                                                        &[("name", &skill_to_delete)],
                                                                                     )));
                                                                                     scan_rev.set(scan_rev() + 1);
                                                                                 }
                                                                                 Ok(Err(e)) => {
-                                                                                    state.status_message.set(Some(format!("Failed to remove skill: {}", e)));
+                                                                                    state.status_message.set(Some(tr(
+                                                                                        lang,
+                                                                                        "targets.msg_remove_failed",
+                                                                                        &[("error", &e.to_string())],
+                                                                                    )));
                                                                                 }
                                                                                 Err(e) => {
-                                                                                    state.status_message.set(Some(format!("Internal task error: {}", e)));
+                                                                                    state.status_message.set(Some(tr(
+                                                                                        lang,
+                                                                                        "targets.msg_remove_internal_error",
+                                                                                        &[("error", &e.to_string())],
+                                                                                    )));
                                                                                 }
                                                                             }
                                                                         });
                                                                     }
                                                                 }
                                                             },
-                                                            "Remove Skill"
+                                                            "{t(lang, \"targets.btn_remove_skill\")}"
                                                         }
                                                     }
                                                 }
@@ -428,21 +447,21 @@ pub fn TabTargets() -> Element {
                     onclick: move |e| e.stop_propagation(),
                     div { class: "modal-header",
                         h3 { class: "modal-title",
-                            if modal_is_edit() { "Edit Destination Folder" } else { "Add Destination Folder" }
+                            if modal_is_edit() { "{t(lang, \"targets.modal_edit_title\")}" } else { "{t(lang, \"targets.modal_add_title\")}" }
                         }
                         button {
                             class: "btn btn-secondary btn-sm",
                             onclick: move |_| is_modal_open.set(false),
-                            "✕"
+                            "{t(lang, \"common.close\")}"
                         }
                     }
                     div { class: "modal-body",
                         div { class: "form-group",
-                            label { class: "form-label", "Destination Name" }
+                            label { class: "form-label", "{t(lang, \"targets.lbl_destination_name\")}" }
                             input {
                                 class: "form-control",
                                 r#type: "text",
-                                placeholder: "e.g. My Project",
+                                placeholder: "{t(lang, \"targets.ph_destination_name\")}",
                                 value: "{form_name}",
                                 oninput: move |e| {
                                     form_name.set(e.value());
@@ -467,17 +486,17 @@ pub fn TabTargets() -> Element {
                                 },
                             }
                             p { style: "font-size: 11px; color: var(--text-muted); margin-top: 4px;",
-                                "A custom display name independent of the filesystem path."
+                                "{t(lang, \"targets.hint_destination_name\")}"
                             }
                         }
                         div { class: "form-group",
-                            label { class: "form-label", "Destination Path" }
+                            label { class: "form-label", "{t(lang, \"targets.lbl_destination_path\")}" }
                             if !is_editing_global {
                                 div { class: "input-with-button",
                                     input {
                                         class: "form-control",
                                         r#type: "text",
-                                        placeholder: "e.g. /Users/svenkalbhenn/Projekte/kunden-projekt",
+                                        placeholder: "{t(lang, \"targets.ph_destination_path\")}",
                                         value: "{form_path}",
                                         oninput: move |e| {
                                             form_path.set(e.value());
@@ -512,7 +531,8 @@ pub fn TabTargets() -> Element {
                                                 } else {
                                                     None
                                                 };
-                                                if let Some(folder) = pick_folder("Select Project Target Directory", start.as_deref()).await {
+                                                let dlg_title = t(lang, "targets.dlg_select_dir");
+                                                if let Some(folder) = pick_folder(&dlg_title, start.as_deref()).await {
                                                     let folder_str = folder.to_string_lossy().to_string();
                                                     form_path.set(folder_str);
                                                     if form_name().trim().is_empty() {
@@ -524,7 +544,7 @@ pub fn TabTargets() -> Element {
                                                 }
                                             });
                                         },
-                                        "Browse..."
+                                        "{t(lang, \"targets.btn_browse\")}"
                                     }
                                 }
                             } else {
@@ -535,7 +555,7 @@ pub fn TabTargets() -> Element {
                                     disabled: true,
                                 }
                                 p { style: "font-size: 11px; color: var(--text-muted); margin-top: 4px;",
-                                    "Global target paths are managed per-harness in the Harnesses tab."
+                                    "{t(lang, \"targets.hint_global_paths\")}"
                                 }
                             }
                         }
@@ -550,7 +570,7 @@ pub fn TabTargets() -> Element {
                             class: "btn btn-secondary",
                             r#type: "button",
                             onclick: move |_| is_modal_open.set(false),
-                            "Cancel"
+                            "{t(lang, \"common.cancel\")}"
                         }
                         button {
                             class: "btn btn-primary",
@@ -570,7 +590,7 @@ pub fn TabTargets() -> Element {
                                     );
                                 }
                             },
-                            if modal_is_edit() { "Save Changes" } else { "Add Destination" }
+                            if modal_is_edit() { "{t(lang, \"common.save_changes\")}" } else { "{t(lang, \"targets.btn_add_destination\")}" }
                         }
                     }
                 }
@@ -578,3 +598,4 @@ pub fn TabTargets() -> Element {
         }
     }
 }
+

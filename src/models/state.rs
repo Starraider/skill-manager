@@ -1,4 +1,5 @@
 use crate::models::config::AppConfig;
+use crate::services::i18n::Language;
 use dioxus::prelude::*;
 use std::collections::HashSet;
 
@@ -19,4 +20,7 @@ pub struct AppState {
     pub selected_skill_names: Signal<HashSet<String>>,
     pub is_copy_modal_open: Signal<bool>,
     pub status_message: Signal<Option<String>>,
+    pub current_language: Signal<Language>,
+    pub is_language_dialog_open: Signal<bool>,
+    pub left_pane_width: Signal<f64>,
 }

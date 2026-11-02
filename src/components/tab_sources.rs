@@ -3,11 +3,13 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 use crate::components::common::{pick_folder, StatusPill};
+use crate::components::resize_handle::ResizeHandle;
 use crate::models::config::SourceConfig;
 use crate::models::skill::Skill;
 use crate::models::state::AppState;
 use crate::services::config_store::{expand_tilde, save_config};
 use crate::services::fs_scanner::scan_skills;
+use crate::services::i18n::{min_left_pane_width, t, tr};
 
 fn open_source_add_dialog(
     mut editing_id: Signal<Option<String>>,
@@ -51,15 +53,16 @@ fn save_source_modal(
     form_path: Signal<String>,
     mut form_error: Signal<Option<String>>,
 ) {
+    let lang = (state.current_language)();
     let trimmed_name = form_name().trim().to_string();
     let trimmed_path = form_path().trim().to_string();
 
     if trimmed_name.is_empty() {
-        form_error.set(Some("Please enter a name for the source folder.".to_string()));
+        form_error.set(Some(t(lang, "sources.err_name_required")));
         return;
     }
     if trimmed_path.is_empty() {
-        form_error.set(Some("Please specify a directory path.".to_string()));
+        form_error.set(Some(t(lang, "sources.err_path_required")));
         return;
     }
 
@@ -77,7 +80,7 @@ fn save_source_modal(
         state.config.set(current_config);
         state
             .status_message
-            .set(Some(format!("Updated source '{}'.", trimmed_name)));
+            .set(Some(tr(lang, "sources.msg_updated", &[("name", &trimmed_name)])));
     } else {
         let id = format!(
             "source-{}",
@@ -97,7 +100,7 @@ fn save_source_modal(
         state.selected_source_id.set(Some(id));
         state
             .status_message
-            .set(Some(format!("Added source '{}'.", trimmed_name)));
+            .set(Some(tr(lang, "sources.msg_added", &[("name", &trimmed_name)])));
     }
 
     is_modal_open.set(false);
@@ -106,6 +109,7 @@ fn save_source_modal(
 #[component]
 pub fn TabSources() -> Element {
     let mut state: AppState = use_context();
+    let lang = (state.current_language)();
     let config = (state.config)();
     let selected_source_id = (state.selected_source_id)();
     let mut selected_skill_names = state.selected_skill_names;
@@ -165,14 +169,23 @@ pub fn TabSources() -> Element {
     };
 
     let selected_source_for_header = selected_source.clone();
+    let pane_width = (state.left_pane_width)();
+    let min_width = min_left_pane_width(lang);
+    let discovered_title = if let Some(ref src) = selected_source {
+        tr(lang, "sources.skills_heading", &[("name", &src.name), ("count", &discovered_skills.len().to_string())])
+    } else {
+        t(lang, "sources.discovered_skills")
+    };
 
     rsx! {
         div { class: "split-layout",
             // Left Pane: Source Folders
-            div { class: "pane-left",
+            div {
+                class: "pane-left",
+                style: "width: {pane_width}px; min-width: {min_width}px;",
                 div { class: "pane-header",
-                    span { class: "pane-title", "Source Repositories" }
-                    div { style: "display: flex; gap: 6px;",
+                    span { class: "pane-title", "{t(lang, \"sources.title\")}" }
+                    div { class: "pane-header-actions",
                         button {
                             class: "btn btn-primary btn-sm",
                             onclick: move |_| {
@@ -185,7 +198,7 @@ pub fn TabSources() -> Element {
                                     is_modal_open,
                                 );
                             },
-                            "+ Add"
+                            "{t(lang, \"sources.btn_add\")}"
                         }
                         button {
                             class: "btn btn-secondary btn-sm",
@@ -206,20 +219,20 @@ pub fn TabSources() -> Element {
                                 }
                             },
                             disabled: selected_source.is_none(),
-                            "Edit"
+                            "{t(lang, \"sources.btn_edit\")}"
                         }
                         button {
                             class: "btn btn-danger btn-sm",
                             onclick: on_remove_source,
                             disabled: selected_source_id.is_none(),
-                            "Remove"
+                            "{t(lang, \"sources.btn_remove\")}"
                         }
                     }
                 }
                 div { class: "pane-body",
                     if config.sources.is_empty() {
                         div { class: "empty-state",
-                            p { "No sources added yet." }
+                            p { "{t(lang, \"sources.empty\")}" }
                             button {
                                 class: "btn btn-secondary btn-sm",
                                 onclick: move |_| {
@@ -232,7 +245,7 @@ pub fn TabSources() -> Element {
                                         is_modal_open,
                                     );
                                 },
-                                "Add Source Folder"
+                                "{t(lang, \"sources.btn_add_folder\")}"
                             }
                         }
                     } else {
@@ -269,7 +282,7 @@ pub fn TabSources() -> Element {
                                                 span { class: "item-name", "{source.name}" }
                                                 button {
                                                     class: "btn-icon",
-                                                    title: "Edit Name and Path",
+                                                    title: "{t(lang, \"sources.tooltip_edit\")}",
                                                     onclick: {
                                                         let s = s_clone.clone();
                                                         move |e| {
@@ -301,17 +314,14 @@ pub fn TabSources() -> Element {
                 }
             }
 
+            // Draggable Resize Handle
+            ResizeHandle {}
+
             // Right Pane: Discovered Skills
             div { class: "pane-right",
                 div { class: "pane-header",
                     div { style: "display: flex; align-items: center; gap: 10px;",
-                        span { class: "pane-title",
-                            if let Some(ref src) = selected_source {
-                                "Skills in {src.name} ({discovered_skills.len()})"
-                            } else {
-                                "Discovered Skills"
-                            }
-                        }
+                        span { class: "pane-title", "{discovered_title}" }
                         if selected_source_for_header.is_some() {
                             button {
                                 class: "btn btn-secondary btn-sm",
@@ -331,8 +341,8 @@ pub fn TabSources() -> Element {
                                         }
                                     }
                                 },
-                                title: "Edit Source Name and Path",
-                                "✎ Edit"
+                                title: "{t(lang, \"sources.btn_edit_source_title\")}",
+                                "{t(lang, \"sources.btn_edit_source\")}"
                             }
                         }
                     }
@@ -340,18 +350,18 @@ pub fn TabSources() -> Element {
                         class: "btn btn-primary btn-sm",
                         onclick: move |_| state.is_copy_modal_open.set(true),
                         disabled: selected_skill_names().is_empty(),
-                        "Copy Skills ({selected_skill_names().len()})"
+                        "{tr(lang, \"sources.btn_copy_skills\", &[(\"count\", &selected_skill_names().len().to_string())])}"
                     }
                 }
 
                 div { class: "pane-body", style: "padding: 0;",
                     if selected_source.is_none() {
                         div { class: "empty-state",
-                            p { "Select or add a source directory on the left to inspect skills." }
+                            p { "{t(lang, \"sources.empty_select_prompt\")}" }
                         }
                     } else if discovered_skills.is_empty() {
                         div { class: "empty-state",
-                            p { "No valid skills with a SKILL.md marker found in this source." }
+                            p { "{t(lang, \"sources.empty_skills\")}" }
                         }
                     } else {
                         div { class: "table-container",
@@ -365,8 +375,8 @@ pub fn TabSources() -> Element {
                                                 onchange: on_toggle_select_all
                                             }
                                         }
-                                        th { "Skill Name" }
-                                        th { "Folder" }
+                                        th { "{t(lang, \"sources.th_skill_name\")}" }
+                                        th { "{t(lang, \"sources.th_folder\")}" }
                                     }
                                 }
                                 tbody {
@@ -374,12 +384,13 @@ pub fn TabSources() -> Element {
                                         {
                                             let s_name = skill.name.clone();
                                             let is_checked = selected_skill_names().contains(&skill.name);
+                                            let fallback_desc = t(lang, "sources.no_description");
                                             let tooltip_text = skill
                                                 .description
                                                 .as_deref()
                                                 .filter(|d| !d.trim().is_empty())
                                                 .or_else(|| skill.title.as_deref().filter(|t| !t.trim().is_empty()))
-                                                .unwrap_or("No description available");
+                                                .unwrap_or(&fallback_desc);
                                             rsx! {
                                                 tr { key: "{skill.name}",
                                                     td {
@@ -432,21 +443,21 @@ pub fn TabSources() -> Element {
                     onclick: move |e| e.stop_propagation(),
                     div { class: "modal-header",
                         h3 { class: "modal-title",
-                            if modal_is_edit() { "Edit Source Folder" } else { "Add Source Folder" }
+                            if modal_is_edit() { "{t(lang, \"sources.modal_edit_title\")}" } else { "{t(lang, \"sources.modal_add_title\")}" }
                         }
                         button {
                             class: "btn btn-secondary btn-sm",
                             onclick: move |_| is_modal_open.set(false),
-                            "✕"
+                            "{t(lang, \"common.close\")}"
                         }
                     }
                     div { class: "modal-body",
                         div { class: "form-group",
-                            label { class: "form-label", "Folder Name" }
+                            label { class: "form-label", "{t(lang, \"sources.lbl_folder_name\")}" }
                             input {
                                 class: "form-control",
                                 r#type: "text",
-                                placeholder: "e.g. TYPO3 Skill",
+                                placeholder: "{t(lang, \"sources.ph_folder_name\")}",
                                 value: "{form_name}",
                                 oninput: move |e| {
                                     form_name.set(e.value());
@@ -467,16 +478,16 @@ pub fn TabSources() -> Element {
                                 },
                             }
                             p { style: "font-size: 11px; color: var(--text-muted); margin-top: 4px;",
-                                "A custom display name independent of the filesystem path."
+                                "{t(lang, \"sources.hint_folder_name\")}"
                             }
                         }
                         div { class: "form-group",
-                            label { class: "form-label", "Folder Path" }
+                            label { class: "form-label", "{t(lang, \"sources.lbl_folder_path\")}" }
                             div { class: "input-with-button",
                                 input {
                                     class: "form-control",
                                     r#type: "text",
-                                    placeholder: "e.g. /Users/svenkalbhenn/Skills/typo3",
+                                    placeholder: "{t(lang, \"sources.ph_folder_path\")}",
                                     value: "{form_path}",
                                     oninput: move |e| {
                                         form_path.set(e.value());
@@ -507,7 +518,8 @@ pub fn TabSources() -> Element {
                                             } else {
                                                 None
                                             };
-                                            if let Some(folder) = pick_folder("Select Source Directory", start.as_deref()).await {
+                                            let dlg_title = t(lang, "sources.dlg_select_dir");
+                                            if let Some(folder) = pick_folder(&dlg_title, start.as_deref()).await {
                                                 let folder_str = folder.to_string_lossy().to_string();
                                                 form_path.set(folder_str);
                                                 if form_name().trim().is_empty() {
@@ -519,7 +531,7 @@ pub fn TabSources() -> Element {
                                             }
                                         });
                                     },
-                                    "Browse..."
+                                    "{t(lang, \"sources.btn_browse\")}"
                                 }
                             }
                         }
@@ -534,7 +546,7 @@ pub fn TabSources() -> Element {
                             class: "btn btn-secondary",
                             r#type: "button",
                             onclick: move |_| is_modal_open.set(false),
-                            "Cancel"
+                            "{t(lang, \"common.cancel\")}"
                         }
                         button {
                             class: "btn btn-primary",
@@ -550,7 +562,7 @@ pub fn TabSources() -> Element {
                                     form_error,
                                 );
                             },
-                            if modal_is_edit() { "Save Changes" } else { "Add Source" }
+                            if modal_is_edit() { "{t(lang, \"common.save_changes\")}" } else { "{t(lang, \"sources.btn_add_source\")}" }
                         }
                     }
                 }
@@ -558,3 +570,4 @@ pub fn TabSources() -> Element {
         }
     }
 }
+

@@ -2,13 +2,16 @@ use dioxus::prelude::*;
 use std::path::PathBuf;
 
 use crate::components::common::pick_folder;
+use crate::components::resize_handle::ResizeHandle;
 use crate::models::config::HarnessConfig;
 use crate::models::state::AppState;
 use crate::services::config_store::save_config;
+use crate::services::i18n::{min_left_pane_width, t, tr};
 
 #[component]
 pub fn TabHarnesses() -> Element {
     let mut state: AppState = use_context();
+    let lang = (state.current_language)();
     let config = (state.config)();
 
     let mut selected_harness_id = use_signal(|| config.harnesses.first().map(|h| h.id.clone()));
@@ -55,7 +58,7 @@ pub fn TabHarnesses() -> Element {
         );
         let new_harness = HarnessConfig {
             id: id.clone(),
-            name: "New Harness".to_string(),
+            name: t(lang, "harnesses.default_new_name"),
             relative_path: PathBuf::from(".new-harness/skills"),
             global_path: None,
             is_pinned: false,
@@ -96,35 +99,46 @@ pub fn TabHarnesses() -> Element {
             state.config.set(current_config);
             state
                 .status_message
-                .set(Some("Harness configuration saved.".to_string()));
+                .set(Some(t(lang, "harnesses.msg_saved")));
         }
     };
 
     let on_pick_global_path = move |_| {
         spawn(async move {
-            if let Some(folder) = pick_folder("Select Global Harness Directory", None).await {
+            let title = t(lang, "harnesses.dlg_select_dir");
+            if let Some(folder) = pick_folder(&title, None).await {
                 form_global_path.set(folder.to_string_lossy().to_string());
             }
         });
     };
 
+    let pane_width = (state.left_pane_width)();
+    let min_width = min_left_pane_width(lang);
+    let pane_title = if let Some(ref h) = selected_harness {
+        tr(lang, "harnesses.configure_heading", &[("name", &h.name)])
+    } else {
+        t(lang, "harnesses.details_heading")
+    };
+
     rsx! {
         div { class: "split-layout",
             // Left Pane: Harness List
-            div { class: "pane-left",
+            div {
+                class: "pane-left",
+                style: "width: {pane_width}px; min-width: {min_width}px;",
                 div { class: "pane-header",
-                    span { class: "pane-title", "Configured Harnesses" }
-                    div { style: "display: flex; gap: 6px;",
+                    span { class: "pane-title", "{t(lang, \"harnesses.title\")}" }
+                    div { class: "pane-header-actions",
                         button {
                             class: "btn btn-primary btn-sm",
                             onclick: on_add_harness,
-                            "+ Add"
+                            "{t(lang, \"harnesses.btn_add\")}"
                         }
                         button {
                             class: "btn btn-danger btn-sm",
                             onclick: on_remove_harness,
                             disabled: selected_harness.is_none(),
-                            "Remove"
+                            "{t(lang, \"harnesses.btn_remove\")}"
                         }
                     }
                 }
@@ -151,33 +165,30 @@ pub fn TabHarnesses() -> Element {
                 }
             }
 
+            // Draggable Resize Handle
+            ResizeHandle {}
+
             // Right Pane: Edit Harness Form
             div { class: "pane-right",
                 div { class: "pane-header",
-                    span { class: "pane-title",
-                        if let Some(ref h) = selected_harness {
-                            "Configure Harness: {h.name}"
-                        } else {
-                            "Harness Details"
-                        }
-                    }
+                    span { class: "pane-title", "{pane_title}" }
                     button {
                         class: "btn btn-primary btn-sm",
                         onclick: on_save_changes,
                         disabled: selected_harness.is_none(),
-                        "Save Changes"
+                        "{t(lang, \"common.save_changes\")}"
                     }
                 }
 
                 div { class: "pane-body", style: "padding: 24px; max-width: 640px;",
                     if selected_harness.is_none() {
                         div { class: "empty-state",
-                            p { "Select a harness on the left to configure its directory paths." }
+                            p { "{t(lang, \"harnesses.empty_select_prompt\")}" }
                         }
                     } else {
                         div {
                             div { class: "form-group",
-                                label { class: "form-label", "Harness Display Name" }
+                                label { class: "form-label", "{t(lang, \"harnesses.lbl_display_name\")}" }
                                 input {
                                     class: "form-control",
                                     r#type: "text",
@@ -187,37 +198,37 @@ pub fn TabHarnesses() -> Element {
                             }
 
                             div { class: "form-group",
-                                label { class: "form-label", "Relative Project Subfolder Path" }
+                                label { class: "form-label", "{t(lang, \"harnesses.lbl_relative_path\")}" }
                                 input {
                                     class: "form-control",
                                     r#type: "text",
-                                    placeholder: "e.g. .claude/skills",
+                                    placeholder: "{t(lang, \"harnesses.ph_relative_path\")}",
                                     value: "{form_rel_path}",
                                     oninput: move |e| form_rel_path.set(e.value())
                                 }
                                 p { style: "font-size: 11px; color: var(--text-muted); margin-top: 4px;",
-                                    "Relative subpath inside project repositories where skills should be deployed."
+                                    "{t(lang, \"harnesses.hint_relative_path\")}"
                                 }
                             }
 
                             div { class: "form-group",
-                                label { class: "form-label", "Global Harness Directory Path (Optional)" }
+                                label { class: "form-label", "{t(lang, \"harnesses.lbl_global_path\")}" }
                                 div { class: "input-with-button",
                                     input {
                                         class: "form-control",
                                         r#type: "text",
-                                        placeholder: "e.g. ~/.claude/skills",
+                                        placeholder: "{t(lang, \"harnesses.ph_global_path\")}",
                                         value: "{form_global_path}",
                                         oninput: move |e| form_global_path.set(e.value())
                                     }
                                     button {
                                         class: "btn btn-secondary",
                                         onclick: on_pick_global_path,
-                                        "Browse..."
+                                        "{t(lang, \"harnesses.btn_browse\")}"
                                     }
                                 }
                                 p { style: "font-size: 11px; color: var(--text-muted); margin-top: 4px;",
-                                    "System-wide folder where skills are installed when deploying to the Global target."
+                                    "{t(lang, \"harnesses.hint_global_path\")}"
                                 }
                             }
                         }
@@ -227,3 +238,4 @@ pub fn TabHarnesses() -> Element {
         }
     }
 }
+
