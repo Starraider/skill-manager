@@ -144,8 +144,8 @@ pub fn TabTargets() -> Element {
 
     // Modal state for Add and Edit Target
     let mut is_modal_open = use_signal(|| false);
-    let mut modal_is_edit = use_signal(|| false);
-    let mut editing_target_id = use_signal(|| None::<String>);
+    let modal_is_edit = use_signal(|| false);
+    let editing_target_id = use_signal(|| None::<String>);
     let mut form_name = use_signal(String::new);
     let mut form_path = use_signal(String::new);
     let mut form_error = use_signal(|| None::<String>);
