@@ -60,7 +60,11 @@ pub fn AppLayout() -> Element {
             // Header
             header { class: "app-header",
                 div { class: "brand-title",
-                    span { "⚡" }
+                    img {
+                        class: "brand-icon",
+                        src: asset!("/assets/icons/app-icon.png"),
+                        alt: "Skill-Manager",
+                    }
                     span { "{t(current_lang, \"app.title\")}" }
                 }
 

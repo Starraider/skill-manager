@@ -58,6 +58,15 @@ body {
   gap: 8px;
 }
 
+.brand-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  object-fit: contain;
+  flex-shrink: 0;
+  display: block;
+}
+
 .tab-nav {
   display: flex;
   gap: 4px;
