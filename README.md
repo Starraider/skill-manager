@@ -141,6 +141,7 @@ source "$HOME/.cargo/env"
 ```
 
 Verify your installation:
+
 ```bash
 rustc --version # Rust 1.75 or later is recommended
 cargo --version
@@ -152,24 +153,29 @@ Because Skill-Manager runs as a native desktop application using the system webv
 
 - **macOS**:
   - Requires Xcode Command Line Tools:
+
     ```bash
     xcode-select --install
     ```
 
 - **Linux (Debian / Ubuntu / Pop!_OS)**:
   - Requires GTK3, WebKit2GTK, and X11 development packages:
+
     ```bash
     sudo apt-get update
     sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev pkg-config build-essential
     ```
+
   *(Note: If your distribution uses WebKit2GTK 4.0, install `libwebkit2gtk-4.0-dev` instead.)*
 
 - **Linux (Fedora / RHEL)**:
+
   ```bash
   sudo dnf install webkit2gtk4.1-devel gtk3-devel libxdo-devel libayatana-appindicator3-devel openssl-devel
   ```
 
 - **Linux (Arch Linux)**:
+
   ```bash
   sudo pacman -S webkit2gtk-4.1 gtk3 xdotool libappindicator-gtk3
   ```
@@ -192,7 +198,8 @@ cd skill-manager
 cargo build --release
 ```
 
-#### Compilation Output:
+#### Compilation Output
+
 - **macOS / Linux**: `target/release/skill-manager`
 - **Windows**: `target\release\skill-manager.exe`
 
@@ -205,16 +212,19 @@ This standalone binary embeds all styling and application logic. It can be moved
 If you want native OS installers or bundles (such as a macOS `.app` / `.dmg`, a Linux `.deb` / `.AppImage`, or a Windows `.msi` / installer), use the official Dioxus CLI:
 
 1. **Install the Dioxus CLI** (if not already installed):
+
    ```bash
    cargo install dioxus-cli --locked
    ```
 
 2. **Bundle the Release Application**:
+
    ```bash
    dx bundle --release
    ```
 
-#### Bundle Output Locations:
+#### Bundle Output Locations
+
 - **macOS**: `target/dx/skill-manager/release/macos/Skill-Manager.app` (and `.dmg`)
 - **Linux**: `target/dx/skill-manager/release/linux/` (`.deb`, `.AppImage`)
 - **Windows**: `target\dx\skill-manager\release\windows\` (installer or portable package)
@@ -226,6 +236,7 @@ If you want native OS installers or bundles (such as a macOS `.app` / `.dmg`, a 
 Instead of manually maintaining cross-compilation toolchains on a single machine, this repository includes an automated GitHub Actions CI release pipeline ([`.github/workflows/release.yml`](.github/workflows/release.yml)).
 
 Whenever a Git version tag (e.g., `v0.1.0`) is pushed, GitHub Actions automatically:
+
 1. Spins up native matrix runners:
    - **macOS (Apple Silicon `aarch64` & Intel `x86_64`)**
    - **Windows (`x86_64`)**
@@ -235,10 +246,12 @@ Whenever a Git version tag (e.g., `v0.1.0`) is pushed, GitHub Actions automatica
 4. Creates a public GitHub Release and uploads all assets.
 
 To trigger an automated build and release:
+
 ```bash
 git tag -a v0.1.0 -m "Release v0.1.0"
 git push origin v0.1.0
 ```
+
 You can also manually trigger builds via the **Run workflow** button in the GitHub repository's **Actions** tab.
 
 ---
@@ -261,12 +274,14 @@ All integration tests run within temporary isolated sandboxes without modifying 
 
 Once compiled via `cargo build --release`, launch the executable directly from the command line:
 
-#### macOS / Linux:
+#### macOS / Linux
+
 ```bash
 ./target/release/skill-manager
 ```
 
-#### Windows:
+#### Windows
+
 ```powershell
 .\target\release\skill-manager.exe
 ```
@@ -277,29 +292,38 @@ Once compiled via `cargo build --release`, launch the executable directly from t
 
 If you bundled the application using `dx bundle --release`:
 
-#### macOS:
+#### macOS
+
 Launch directly from the terminal:
+
 ```bash
 open target/dx/skill-manager/release/macos/Skill-Manager.app
 ```
+
 Or copy it to your personal or system Applications directory to launch via Spotlight or Launchpad:
+
 ```bash
 cp -r target/dx/skill-manager/release/macos/Skill-Manager.app /Applications/
 ```
 
-#### Linux:
+#### Linux
+
 Make the AppImage executable and launch it:
+
 ```bash
 chmod +x target/dx/skill-manager/release/linux/*.AppImage
 ./target/dx/skill-manager/release/linux/*.AppImage
 ```
+
 Or install the `.deb` package:
+
 ```bash
 sudo dpkg -i target/dx/skill-manager/release/linux/*.deb
 skill-manager
 ```
 
-#### Windows:
+#### Windows
+
 Double-click the generated `.exe` or run the installer located in `target\dx\skill-manager\release\windows\`.
 
 ---
@@ -313,6 +337,7 @@ cargo install --path .
 ```
 
 You can now start Skill-Manager from any terminal simply by executing:
+
 ```bash
 skill-manager
 ```
@@ -401,4 +426,3 @@ skill-manager/
 ## License
 
 This project is open-source. Refer to the repository license or project author for details.
-
