@@ -58,7 +58,7 @@ Modern AI-assisted software development relies on diverse agentic coding toolsâ€
 - Project-level relative directories vary widely (e.g., `.codex/skills`, `.claude/skills`, `.cursor/skills`, `.antigravity/skills`).
 - Global user directories are fragmented (e.g., `~/.agents/skills`, `~/.claude/skills`, `~/.cursor/skills`, `~/.gemini/antigravity/skills`).
 - Maintaining custom skills across dozens of local project repositories and global paths requires tedious, error-prone manual file copying or ad-hoc shell scripts.
-- Multiple harnesses often share identical paths, causing redundant disk writes or lock contention.
+- Unused AI skills should be removed from projects because their descriptions and system prompts are repeatedly injected into the LLM context, creating constant token overhead and unnecessarily inflating operational costs during every request.
 - There is no central interface to inspect which skills are active in a project or remove a skill cleanly across all tools in one step.
 
 ### How Skill-Manager Solves It
