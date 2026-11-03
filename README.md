@@ -461,4 +461,6 @@ skill-manager/
 
 ## License
 
-This project is open-source. Refer to the repository license or project author for details.
+This project is licensed under the [Creative Commons Attribution 4.0 International License (CC BY 4.0)](LICENSE).
+
+Copyright (c) 2026 Sven Kalbhenn ([https://www.skom.de](https://www.skom.de)).
