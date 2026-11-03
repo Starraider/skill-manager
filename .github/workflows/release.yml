@@ -37,7 +37,7 @@ jobs:
             target-name: Windows (x86_64)
             arch: windows-x86_64
             target: x86_64-pc-windows-msvc
-          - os: ubuntu-22.04
+          - os: ubuntu-latest
             target-name: Linux (x86_64)
             arch: linux-x86_64
             target: x86_64-unknown-linux-gnu
@@ -63,12 +63,12 @@ jobs:
             libxdo-dev \
             libsoup-3.0-dev \
             libjavascriptcoregtk-4.1-dev \
-            libfuse2 \
             file \
             wget \
             pkg-config \
             libssl-dev \
             build-essential
+          sudo apt-get install -y libfuse2t64 || sudo apt-get install -y libfuse2 || true
 
       - name: Install Dioxus CLI
         uses: taiki-e/install-action@v2
