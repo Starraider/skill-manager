@@ -4,8 +4,27 @@
 
 ---
 
+## Downloads & Releases
+
+Pre-compiled desktop applications are automatically built and released for macOS, Windows, and Linux via GitHub Actions CI:
+
+👉 **[Download the Latest Release for your OS](https://github.com/Starraider/skill-manager/releases/latest)**
+
+| Operating System | Architecture | Installer / Package | Standalone Archive |
+| :--- | :--- | :--- | :--- |
+| **macOS** | Apple Silicon (`arm64` / M1/M2/M3/M4) | [`.dmg` Installer](https://github.com/Starraider/skill-manager/releases/latest/download/SkillManager-macos-aarch64.dmg) | [`.zip` (`.app`)](https://github.com/Starraider/skill-manager/releases/latest/download/SkillManager-macos-aarch64.zip) |
+| **macOS** | Intel (`x86_64`) | [`.dmg` Installer](https://github.com/Starraider/skill-manager/releases/latest/download/SkillManager-macos-x86_64.dmg) | [`.zip` (`.app`)](https://github.com/Starraider/skill-manager/releases/latest/download/SkillManager-macos-x86_64.zip) |
+| **Windows** | 64-bit (`x86_64`) | [`.msi` Installer](https://github.com/Starraider/skill-manager/releases/latest/download/SkillManager-windows-x86_64.msi) | [`.zip` (`skill-manager.exe`)](https://github.com/Starraider/skill-manager/releases/latest/download/SkillManager-windows-x86_64.zip) |
+| **Linux** | 64-bit (`x86_64`) | [`.deb`](https://github.com/Starraider/skill-manager/releases/latest/download/SkillManager-linux-x86_64.deb) / [`.AppImage`](https://github.com/Starraider/skill-manager/releases/latest/download/SkillManager-linux-x86_64.AppImage) | [`.tar.gz` (`skill-manager`)](https://github.com/Starraider/skill-manager/releases/latest/download/SkillManager-linux-x86_64.tar.gz) |
+
+> [!NOTE]
+> All binaries are built and bundled using the automated [GitHub Actions CI Workflow](.github/workflows/release.yml) whenever a new version tag (e.g. `v0.1.0`) is pushed. To view previous versions, visit the [Releases Archive](https://github.com/Starraider/skill-manager/releases).
+
+---
+
 ## Table of Contents
 
+- [Downloads & Releases](#downloads--releases)
 - [What Skill-Manager Does](#what-skill-manager-does)
   - [The Problem](#the-problem)
   - [How Skill-Manager Solves It](#how-skill-manager-solves-it)
@@ -16,6 +35,7 @@
   - [Prerequisites & System Dependencies](#prerequisites--system-dependencies)
   - [Compiling with Cargo (Standalone Binary)](#1-compiling-with-cargo-standalone-binary)
   - [Compiling with Dioxus CLI (Application Bundles)](#2-compiling-with-dioxus-cli-application-bundles)
+  - [Automated Multi-Platform CI Builds](#3-automated-multi-platform-ci-builds-github-actions)
   - [Running Tests Prior to Compilation](#running-tests-prior-to-compilation)
 - [How to Start the Fully Compiled Program](#how-to-start-the-fully-compiled-program)
   - [Starting the Standalone Binary](#1-starting-the-standalone-binary)
@@ -198,6 +218,28 @@ If you want native OS installers or bundles (such as a macOS `.app` / `.dmg`, a 
 - **macOS**: `target/dx/skill-manager/release/macos/Skill-Manager.app` (and `.dmg`)
 - **Linux**: `target/dx/skill-manager/release/linux/` (`.deb`, `.AppImage`)
 - **Windows**: `target\dx\skill-manager\release\windows\` (installer or portable package)
+
+---
+
+### 3. Automated Multi-Platform CI Builds (GitHub Actions)
+
+Instead of manually maintaining cross-compilation toolchains on a single machine, this repository includes an automated GitHub Actions CI release pipeline ([`.github/workflows/release.yml`](.github/workflows/release.yml)).
+
+Whenever a Git version tag (e.g., `v0.1.0`) is pushed, GitHub Actions automatically:
+1. Spins up native matrix runners:
+   - **macOS (Apple Silicon `aarch64` & Intel `x86_64`)**
+   - **Windows (`x86_64`)**
+   - **Linux (`x86_64`)**
+2. Compiles optimized binaries and runs the test suite.
+3. Generates native application packages (`.dmg`, `.deb`, `.AppImage`, `.msi`) and portable archives (`.zip`, `.tar.gz`).
+4. Creates a public GitHub Release and uploads all assets.
+
+To trigger an automated build and release:
+```bash
+git tag -a v0.1.0 -m "Release v0.1.0"
+git push origin v0.1.0
+```
+You can also manually trigger builds via the **Run workflow** button in the GitHub repository's **Actions** tab.
 
 ---
 
