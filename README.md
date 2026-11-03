@@ -1,4 +1,4 @@
-# Skill-Manager
+# <img src="assets/icons/icon.png" alt="Skill-Manager Logo" width="36" height="36" align="center" style="vertical-align: middle;" /> Skill-Manager
 
 **Skill-Manager** is a high-performance cross-platform desktop application built in Rust and [Dioxus 0.7](https://dioxuslabs.com/) designed to discover, distribute, and synchronize LLM agent skills across multiple AI coding assistants, development projects, and global environments.
 
