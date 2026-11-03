@@ -30,6 +30,7 @@ Pre-compiled desktop applications are automatically built and released for macOS
   - [How Skill-Manager Solves It](#how-skill-manager-solves-it)
   - [Core Features & Architecture](#core-features--architecture)
   - [Key Concepts](#key-concepts)
+  - [How to use Skill Manager](#how-to-use-skill-manager)
   - [Built-In Harness Defaults](#built-in-harness-defaults)
 - [How to Compile Skill-Manager](#how-to-compile-skill-manager)
   - [Prerequisites & System Dependencies](#prerequisites--system-dependencies)
@@ -112,16 +113,51 @@ Skill-Manager provides a centralized native desktop dashboard that acts as the s
 
 ---
 
+### How to use Skill Manager
+
+Follow these steps to add skills to a project:
+
+1. **Select the harnesses you are using and verify their local path and global path.**
+   Open the **Harnesses** tab to review the AI coding assistants you work with (e.g., Claude Code, Cursor, Codex). Verify that their local (relative) and global skill directory paths match your setup, or customize them as needed. Remove the preconfigured harnesses if you are not using them. Leave the "Default" harness untouched, which is used for the "Global" distribution target.
+
+2. **Add a source path.**
+   Navigate to the **Sources** tab and click **+ Add** to add the directory where your skills are stored or authored. Skill-Manager will scan the directory and list all detected skills.
+
+3. **Add a target.**
+   Switch to the **Targets** tab and click **+ Add** to register your project repository directory as a destination (the built-in **Global** target is also available for system-wide installations).
+
+4. **In the sources list, select the desired skills, click "Copy Skills", and then choose the target.**
+   Return to the **Sources** tab, check the boxes next to the skills you want to add, click the **Copy Skills** button in the toolbar, and select your target project in the dialog to deploy the skills across all configured harness folders.
+
+Follow these steps to remove skills from a project:
+
+1. Switch to the **Targets** tab.
+2. Select the target project in the list.
+3. Select skills which you want to remove.
+4. Click the **Remove Skills** button in the toolbar
+
+---
+
 ### Built-In Harness Defaults
 
-Skill-Manager comes pre-configured with four major AI coding harnesses:
+Skill-Manager comes pre-configured with 11 major AI coding assistants and harnesses:
 
-| Harness | Project Relative Path | Global Path |
-| :--- | :--- | :--- |
-| **Codex** | `.codex/skills` | `~/.agents/skills` |
-| **Claude Code** | `.claude/skills` | `~/.claude/skills` |
-| **Cursor** | `.cursor/skills` | `~/.cursor/skills` |
-| **Antigravity** | `.antigravity/skills` | `~/.gemini/antigravity/skills` |
+| Harness | Project Relative Path | Global Path | Supported Standards & Notes |
+| :--- | :--- | :--- | :--- |
+| **OpenAI Codex** | `.agents/skills` | `~/.agents/skills` | Vendor-neutral standard (legacy fallback: `.codex/skills`) |
+| **Claude Code** | `.claude/skills` | `~/.claude/skills` | Tool-specific proprietary path (`.claude/skills`) |
+| **Cursor** | `.agents/skills` | `~/.agents/skills` | Vendor-neutral standard (also supports `.cursor/skills`) |
+| **Google Antigravity** | `.agents/skills` | `~/.agents/skills` | Vendor-neutral standard (also supports `~/.gemini/config/skills`) |
+| **OpenCode** | `.agents/skills` | `~/.agents/skills` | Vendor-neutral standard (also supports `.opencode/skills`) |
+| **GitHub Copilot** | `.agents/skills` | `~/.agents/skills` | Vendor-neutral standard (also supports `.github/skills`) |
+| **Windsurf** | `.agents/skills` | `~/.agents/skills` | Vendor-neutral standard (also supports `.windsurf/skills`) |
+| **Pi** | `.agents/skills` | `~/.agents/skills` | Vendor-neutral standard (also supports `.pi/skills`) |
+| **Cline** | `.agents/skills` | `~/.agents/skills` | Vendor-neutral standard (also supports `.cline/skills`) |
+| **Qoder** | `.qoder/skills` | `~/.qoder/skills` | Tool-specific proprietary path (`.qoder/skills`) |
+| **Roo Code** | `.agents/skills` | `~/.agents/skills` | Vendor-neutral standard (also supports `.roo/skills`) |
+
+> [!NOTE]
+> **Standard Path Preference Principle**: Wherever an AI assistant natively supports the open, vendor-neutral `.agents/skills` specification, Skill-Manager adopts it as the default. Thanks to Skill-Manager's automatic path deduplication and canonicalization, deploying to multiple harnesses that share `.agents/skills` performs a single, safe disk write without duplicate copies or write conflicts.
 
 You can freely add, modify, or remove custom harnesses directly within the **Harnesses** tab.
 
@@ -351,7 +387,7 @@ When Skill-Manager launches for the first time, it automatically creates its con
 - **macOS / Linux**: `~/.config/skill-manager/config.json`
 - **Windows**: `%APPDATA%\skill-manager\config.json`
 
-The file is seeded with the default harness definitions (Codex, Claude Code, Cursor, Antigravity) and the pinned **Global** target. Any updates made through the user interface are saved atomically to this file.
+The file is seeded with the 11 default harness definitions (OpenAI Codex, Claude Code, Cursor, Google Antigravity, OpenCode, GitHub Copilot, Windsurf, Pi, Cline, Qoder, Roo Code) and the pinned **Global** target. Any updates made through the user interface are saved atomically to this file.
 
 ---
 
