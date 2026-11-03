@@ -157,21 +157,21 @@ Because Skill-Manager runs as a native desktop application using the system webv
     ```
 
 - **Linux (Debian / Ubuntu / Pop!_OS)**:
-  - Requires GTK3 and WebKit2GTK development packages:
+  - Requires GTK3, WebKit2GTK, and X11 development packages:
     ```bash
     sudo apt-get update
-    sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libssl-dev pkg-config build-essential
+    sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libxdo-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev pkg-config build-essential
     ```
   *(Note: If your distribution uses WebKit2GTK 4.0, install `libwebkit2gtk-4.0-dev` instead.)*
 
 - **Linux (Fedora / RHEL)**:
   ```bash
-  sudo dnf install webkit2gtk4.1-devel gtk3-devel openssl-devel
+  sudo dnf install webkit2gtk4.1-devel gtk3-devel libxdo-devel libayatana-appindicator3-devel openssl-devel
   ```
 
 - **Linux (Arch Linux)**:
   ```bash
-  sudo pacman -S webkit2gtk-4.1 gtk3
+  sudo pacman -S webkit2gtk-4.1 gtk3 xdotool libappindicator-gtk3
   ```
 
 - **Windows**:
